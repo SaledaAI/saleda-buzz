@@ -76,10 +76,21 @@ export function getDiscoveredPersonaModelOptions(
 
   return [
     ...defaultModelOption,
-    ...explicitModels.map((model) => ({
-      id: model.id,
-      label: resolveModelLabel(model.id, model.name, provider),
-    })),
+    ...explicitModels.map((model) => {
+      const toolSupport = response.modelToolSupport?.[model.id] ?? "unknown";
+      return {
+        id: model.id,
+        label:
+          provider === "ollama" && toolSupport === "unsupported"
+            ? `${resolveModelLabel(model.id, model.name, provider)} (tools unsupported)`
+            : provider === "ollama" && toolSupport === "unknown"
+              ? `${resolveModelLabel(model.id, model.name, provider)} (tool support unknown)`
+              : resolveModelLabel(model.id, model.name, provider),
+        ...(provider === "ollama" && toolSupport === "unsupported"
+          ? { disabled: true }
+          : {}),
+      };
+    }),
   ];
 }
 

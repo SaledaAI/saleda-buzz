@@ -270,6 +270,17 @@ fn openai_tool_call(id: &str, name: &str, args: Value) -> Value {
     })
 }
 
+fn openai_refusal(content: &str) -> Value {
+    json!({
+        "id": "cc-refusal", "object": "chat.completion", "model": "fake-model",
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": content},
+            "finish_reason": "content_filter",
+        }],
+    })
+}
+
 async fn init_session(h: &mut Harness, mcp_servers: Value) -> String {
     h.send(
         "initialize",
@@ -1891,6 +1902,18 @@ fn openai_shell_send(id: &str) -> Value {
     )
 }
 
+fn openai_structured_reply(id: &str) -> Value {
+    openai_tool_call(
+        id,
+        "fake__buzz_reply",
+        json!({
+            "channel": "4970d70d-113a-47dc-883f-ff1199937e79",
+            "reply_to": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "content": "hi",
+        }),
+    )
+}
+
 /// Run one prompt to completion, answering any permission requests, and
 /// return the final response.
 async fn prompt_to_completion(h: &mut Harness, sid: &str) -> Value {
@@ -2044,6 +2067,208 @@ async fn reply_guard_satisfied_by_registered_shell_send() {
     );
     assert_eq!(reply_nag_count(&captured[1]), 0);
     h.shutdown().await;
+}
+
+/// Ollama's provider profile upgrades the advisory guard into a delivery
+/// contract: a text-only end reruns with required tool choice, preferring the
+/// structured reply tool, and only CLI `accepted:true` satisfies it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ollama_reply_guard_requires_and_verifies_delivery() {
+    let llm = spawn_capturing_llm(vec![
+        openai_text("forgot to publish"),
+        openai_structured_reply("tc-ollama-send"),
+        openai_text("posted"),
+    ])
+    .await;
+    let mut h = Harness::spawn_with_env(
+        &llm.url,
+        &[
+            ("BUZZ_AGENT_PROVIDER", "ollama"),
+            ("OLLAMA_MODEL", "qwen3"),
+            ("OLLAMA_BASE_URL", llm.url.as_str()),
+        ],
+    )
+    .await;
+    let reply_result = "{\"event_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"accepted\":true,\"message\":\"\"}";
+    let sid = init_session_with_fake_mcp(
+        &mut h,
+        &[
+            ("FAKE_MCP_TOOL_COUNT", "1"),
+            ("FAKE_MCP_SHELL_TOOL", "1"),
+            ("FAKE_MCP_BUZZ_REPLY_TOOL", "1"),
+            ("FAKE_MCP_RESULT_TEXT", reply_result),
+        ],
+    )
+    .await;
+
+    let r = prompt_to_completion(&mut h, &sid).await;
+    assert_eq!(r["result"]["stopReason"], "end_turn", "{r}");
+
+    let captured = llm.captured.lock().await;
+    assert_eq!(captured.len(), 3);
+    assert_eq!(captured[0]["tool_choice"], "auto");
+    assert_eq!(
+        captured[1]["tool_choice"],
+        json!({"type": "function", "function": {"name": "fake__buzz_reply"}})
+    );
+    assert_eq!(captured[2]["tool_choice"], "auto");
+    h.shutdown().await;
+}
+
+/// A progress post cannot satisfy enforced delivery when the model performs
+/// more tool work afterward. The completed turn must be closed by a fresh,
+/// accepted Buzz message.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ollama_reply_guard_requires_send_after_later_tool_work() {
+    let llm = spawn_capturing_llm(vec![
+        openai_shell_send("tc-progress"),
+        openai_tool_call(
+            "tc-work",
+            "fake__shell",
+            json!({"command": "cargo test -p example"}),
+        ),
+        openai_text("finished, but forgot the final message"),
+        openai_shell_send("tc-final"),
+        openai_text("posted"),
+    ])
+    .await;
+    let mut h = Harness::spawn_with_env(
+        &llm.url,
+        &[
+            ("BUZZ_AGENT_PROVIDER", "ollama"),
+            ("OLLAMA_MODEL", "qwen3"),
+            ("OLLAMA_BASE_URL", llm.url.as_str()),
+        ],
+    )
+    .await;
+    let shell_result = json!({
+        "exit_code": 0,
+        "stdout": "{\"event_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"accepted\":true,\"message\":\"\"}\n",
+        "stderr": "",
+    })
+    .to_string();
+    let sid = init_session_with_fake_mcp(
+        &mut h,
+        &[
+            ("FAKE_MCP_TOOL_COUNT", "1"),
+            ("FAKE_MCP_SHELL_TOOL", "1"),
+            ("FAKE_MCP_RESULT_TEXT", shell_result.as_str()),
+        ],
+    )
+    .await;
+
+    let r = prompt_to_completion(&mut h, &sid).await;
+    assert_eq!(r["result"]["stopReason"], "end_turn", "{r}");
+
+    let captured = llm.captured.lock().await;
+    assert_eq!(captured.len(), 5);
+    assert_eq!(captured[2]["tool_choice"], "auto");
+    assert_eq!(
+        captured[3]["tool_choice"],
+        json!({"type": "function", "function": {"name": "fake__shell"}})
+    );
+    h.shutdown().await;
+}
+
+/// Hugging Face uses the same enforced contract. Repeated plain text is a
+/// visible delivery error, never a successful ACP turn with no Buzz message.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn huggingface_reply_guard_errors_after_required_retries() {
+    let llm = spawn_capturing_llm(vec![
+        openai_text("silent-1"),
+        openai_text("silent-2"),
+        openai_text("silent-3"),
+    ])
+    .await;
+    let mut h = Harness::spawn_with_env(
+        &llm.url,
+        &[
+            ("BUZZ_AGENT_PROVIDER", "huggingface"),
+            ("HF_TOKEN", "hf_test"),
+            ("HUGGINGFACE_MODEL", "model:provider"),
+            ("HF_INFERENCE_BASE_URL", llm.url.as_str()),
+        ],
+    )
+    .await;
+    let sid = init_session_with_fake_mcp(
+        &mut h,
+        &[("FAKE_MCP_TOOL_COUNT", "1"), ("FAKE_MCP_SHELL_TOOL", "1")],
+    )
+    .await;
+
+    let r = prompt_to_completion(&mut h, &sid).await;
+    let message = r["error"]["message"].as_str().unwrap_or("");
+    assert!(
+        message.contains("required Buzz reply was not published"),
+        "unexpected response: {r}"
+    );
+
+    let captured = llm.captured.lock().await;
+    assert_eq!(captured.len(), 3);
+    assert_eq!(captured[0]["tool_choice"], "auto");
+    let forced_shell = json!({"type": "function", "function": {"name": "fake__shell"}});
+    assert_eq!(captured[1]["tool_choice"], forced_shell);
+    assert_eq!(captured[2]["tool_choice"], forced_shell);
+    h.shutdown().await;
+}
+
+/// Enforced provider profiles have one opt-out (`BUZZ_AGENT_REQUIRE_REPLY=0`).
+/// Tuning the shared hook objection budget must not silently disable delivery.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ollama_enforced_delivery_survives_zero_stop_budget() {
+    let llm = spawn_capturing_llm(vec![openai_text("silent")]).await;
+    let mut h = Harness::spawn_with_env(
+        &llm.url,
+        &[
+            ("BUZZ_AGENT_PROVIDER", "ollama"),
+            ("OLLAMA_MODEL", "qwen3"),
+            ("OLLAMA_BASE_URL", llm.url.as_str()),
+            ("BUZZ_AGENT_STOP_MAX_REJECTIONS", "0"),
+        ],
+    )
+    .await;
+    let sid = init_session(&mut h, json!([])).await;
+
+    let r = prompt_to_completion(&mut h, &sid).await;
+    assert!(r["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("required Buzz reply was not published")));
+    assert_eq!(llm.captured.lock().await.len(), 1);
+    h.shutdown().await;
+}
+
+/// Provider terminal conditions are errors when no Buzz message was accepted;
+/// they must not masquerade as successful, user-visible turns.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ollama_enforced_delivery_covers_round_token_and_refusal_stops() {
+    for (extra_env, response) in [
+        (vec![("BUZZ_AGENT_MAX_ROUNDS", "1")], openai_text("silent")),
+        (
+            vec![("BUZZ_AGENT_MAX_TOKEN_RECOVERIES", "0")],
+            openai_max_tokens("truncated", json!([])),
+        ),
+        (Vec::new(), openai_refusal("refused")),
+    ] {
+        let llm = spawn_capturing_llm(vec![response]).await;
+        let mut env = vec![
+            ("BUZZ_AGENT_PROVIDER", "ollama"),
+            ("OLLAMA_MODEL", "qwen3"),
+            ("OLLAMA_BASE_URL", llm.url.as_str()),
+        ];
+        env.extend(extra_env);
+        let mut h = Harness::spawn_with_env(&llm.url, &env).await;
+        let sid = init_session(&mut h, json!([])).await;
+
+        let r = prompt_to_completion(&mut h, &sid).await;
+        assert!(
+            r["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("required Buzz reply was not published")),
+            "unexpected terminal response: {r}"
+        );
+        assert_eq!(llm.captured.lock().await.len(), 1);
+        h.shutdown().await;
+    }
 }
 
 /// A publish-shaped call to a shell tool that is *not registered* never runs —

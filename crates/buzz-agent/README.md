@@ -181,32 +181,34 @@ Everything is environment variables. No flags, no config files. (We are a subpro
 | `BUZZ_AGENT_MAX_LINE_BYTES` | `4194304` | 4 MiB. Hard cap on inbound JSON-RPC frames. |
 | `BUZZ_AGENT_MAX_HISTORY_BYTES` | `1048576` | 1 MiB. Old turns are evicted past this. |
 | `BUZZ_AGENT_MAX_TOOL_RESULT_TEXT_BYTES` | `51200` | 50 KiB. Per-result cap on tool-output text; oversize is middle-elided (head + tail kept) with an inline marker. Images are exempt. |
-| `BUZZ_AGENT_REQUIRE_REPLY` | `0` (`1` on mesh) | `1` enables the [reply guard](#reply-guard) — remind the model to publish when a turn is about to end with nothing posted to Buzz. Desktop defaults it to `1` for Buzz shared-compute agents. |
+| `BUZZ_AGENT_REQUIRE_REPLY` | provider-dependent | `1` enables the [reply guard](#reply-guard). Ollama, Hugging Face, and Desktop shared-compute agents default it on; an explicit `0` always opts out. |
 
 
 ## Reply Guard
 
-Off by default, except on Buzz shared-compute (mesh) agents, where Buzz Desktop
-sets `BUZZ_AGENT_REQUIRE_REPLY=1` automatically. With it enabled, a turn that is
-about to end without any recognized attempt to post to Buzz gets a reminder that
-its assistant text is invisible to humans, and is rerolled.
+Off by default, except for Ollama, Hugging Face, and Buzz shared-compute (mesh)
+agents. With it enabled, a turn that is about to end without a qualifying Buzz
+post gets a reminder that its assistant text is invisible to humans, and is
+rerolled.
 
 This exists because a Buzz agent's reasoning and tool output are not shown to
 anyone. A turn that does real work and never posts is a silent failure — the
 requester waits on a result that was produced and thrown away.
 
-Mesh agents get it by default because they run on small local models, which are
-the ones most likely to do the work and then end the turn without publishing it.
-Setting `BUZZ_AGENT_REQUIRE_REPLY=0` on the agent, persona, or global env opts a
-mesh agent back out; the default never overrides an explicit value.
+Local and routed open-model providers get it by default because their model and
+route catalogs include models with widely varying tool-use reliability. Setting
+`BUZZ_AGENT_REQUIRE_REPLY=0` on the agent, persona, or global env opts out; the
+profile default never overrides an explicit value.
 
-**Advisory, never a trap.** At most two reminders, then the turn ends whether or
-not anything was published. The guard catches accidental omission; it does not
-compel speech. The reminder text explicitly licenses silence, because the
-built-in system prompt says publishing is optional and silence is often the
-correct outcome.
+For legacy opt-in and mesh agents the guard remains advisory: after at most two
+reminders the turn may end. Ollama and Hugging Face profiles enforce delivery:
+after a text-only end they retry with required tool choice, and exhaustion is an
+explicit error rather than a successful unpublished turn. The retry prefers a
+registered `buzz_reply` structured MCP tool and falls back to a registered shell
+tool running `buzz messages send`. Enforced delivery is satisfied only by one
+of those accepted message publishes, not by a reaction or ACP assistant text.
 
-**Recognition contract.** A turn counts as having replied when it issues a call
+**Advisory recognition contract.** A turn counts as having replied when it issues a call
 that:
 
 - resolves to a registered, non-hook tool (a hallucinated tool name is rejected
@@ -224,24 +226,30 @@ Detection is checked **after** the per-turn tool-call cap
 (`MAX_TOOL_CALLS_PER_TURN`) is applied: a publish-shaped call that was discarded
 never ran.
 
-**It recognizes an attempt, not a successful publish.** Only the command text is
-inspected, never the exit status. A send that fails still satisfies the guard —
-which is fine, since a failed send already returns a non-zero exit and error
-JSON to the model, louder feedback than a reminder.
+In advisory mode, the command shape remains sufficient. Enforced delivery
+accepts the registered structured `buzz_reply` tool when it has non-empty
+`channel` and `content` arguments, or uses a stricter shell-command token check
+(quoted or argument-only text does not count). Both paths accept messages rather
+than reactions and validate the result: the CLI payload must contain
+`accepted: true` plus a canonical 64-hex-character `event_id`; the shell path
+must also exit zero. A rejected or malformed send therefore keeps the guard
+unsatisfied and is reported as a delivery failure if retries exhaust.
 
 **Known limits**, both deliberate. A command assembled at runtime (`$CMD`) or
 buried in a wrapper script is missed, so that turn is reminded despite having
-posted. Text that merely quotes a send (`echo "buzz messages send"`) matches, so
-that turn is not reminded. Missing a real post is the expensive direction, and
-substring matching is the forgiving one there. Neither edge is pinned by a test;
-the matcher is free to improve.
+posted. Text that merely quotes a send (`echo "buzz messages send"`) still
+matches the legacy advisory guard, but cannot satisfy enforced delivery.
+Missing a real post is the expensive direction, and substring matching remains
+the forgiving advisory behavior.
 
 **Budget.** Reminders ride the existing `_Stop` gate and share
 `BUZZ_AGENT_STOP_MAX_REJECTIONS` — the outer cap on every end-turn objection.
-At the default 3 both reminders fit; at 1 only one does; at 0 the guard is off
-along with the hooks. A round carrying both a `_Stop` hook objection and a
-reminder costs one rejection and delivers both texts. This is not a new
-lifecycle hook — see [MCP_DRIVEN_HOOKS.md](../../docs/MCP_DRIVEN_HOOKS.md).
+At the default 3 both reminders fit; at 1 only one does. At 0, advisory guards
+are off along with hooks; enforced profiles skip reminders but still return a
+delivery error unless `BUZZ_AGENT_REQUIRE_REPLY=0` explicitly opts out. A round
+carrying both a `_Stop` hook objection and a reminder costs one rejection and
+delivers both texts. This is not a new lifecycle hook — see
+[MCP_DRIVEN_HOOKS.md](../../docs/MCP_DRIVEN_HOOKS.md).
 
 
 ## Providers

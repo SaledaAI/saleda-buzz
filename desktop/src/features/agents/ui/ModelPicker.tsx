@@ -277,8 +277,23 @@ export function ModelPicker({
               value={currentValue}
             >
               {modelsData.models.map((model) => (
-                <DropdownMenuRadioItem key={model.id} value={model.id}>
+                <DropdownMenuRadioItem
+                  disabled={
+                    agent.provider === "ollama" &&
+                    modelsData.modelToolSupport?.[model.id] === "unsupported"
+                  }
+                  key={model.id}
+                  value={model.id}
+                >
                   {resolveModelLabel(model.id, model.name, agent.provider)}
+                  {agent.provider === "ollama" &&
+                  modelsData.modelToolSupport?.[model.id] === "unsupported"
+                    ? " (tools unsupported)"
+                    : agent.provider === "ollama" &&
+                        (modelsData.modelToolSupport?.[model.id] ??
+                          "unknown") === "unknown"
+                      ? " (tool support unknown)"
+                      : null}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>

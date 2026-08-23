@@ -14,6 +14,7 @@ function response(overrides = {}) {
     agentName: "mock",
     agentVersion: "0.0.0",
     models: [],
+    modelToolSupport: {},
     agentDefaultModel: null,
     selectedModel: null,
     supportsSwitching: true,
@@ -115,6 +116,35 @@ test("returns null when discovery is unsupported or empty", () => {
     null,
   );
   assert.equal(getDiscoveredPersonaModelOptions(null, ""), null);
+});
+
+test("Ollama discovery disables unsupported models and labels unknown support", () => {
+  const options = getDiscoveredPersonaModelOptions(
+    response({
+      models: [
+        { id: "qwen3:8b", name: "Qwen 3", description: null },
+        { id: "gemma:2b", name: "Gemma", description: null },
+        { id: "custom:latest", name: null, description: null },
+      ],
+      modelToolSupport: {
+        "qwen3:8b": "supported",
+        "gemma:2b": "unsupported",
+        "custom:latest": "unknown",
+      },
+    }),
+    "ollama",
+  );
+
+  assert.deepEqual(
+    options.map(({ id, disabled }) => ({ id, disabled: disabled ?? false })),
+    [
+      { id: "qwen3:8b", disabled: false },
+      { id: "gemma:2b", disabled: true },
+      { id: "custom:latest", disabled: false },
+    ],
+  );
+  assert.match(options[1].label, /tools unsupported/);
+  assert.match(options[2].label, /support unknown/);
 });
 
 // ── synthesizeEmptyDiscoveryStatus ────────────────────────────────────────────

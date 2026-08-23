@@ -50,6 +50,7 @@ const KNOWN_LLM_PROVIDER_IDS = [
   "openai",
   "openai-compat",
   "openrouter",
+  "ollama",
 ] as const;
 
 type PersonaLlmProviderId = (typeof KNOWN_LLM_PROVIDER_IDS)[number];
@@ -57,6 +58,7 @@ type PersonaLlmProviderId = (typeof KNOWN_LLM_PROVIDER_IDS)[number];
 export type PersonaModelOption = {
   id: string;
   label: string;
+  disabled?: boolean;
 };
 
 export type PersonaDropdownOption = {
@@ -328,7 +330,8 @@ export function providerRequiresExplicitModel(
     trimmedProvider === "anthropic" ||
     trimmedProvider === "openai" ||
     trimmedProvider === "openai-compat" ||
-    trimmedProvider === "openrouter"
+    trimmedProvider === "openrouter" ||
+    trimmedProvider === "ollama"
   );
 }
 

@@ -12,6 +12,8 @@
 //!                              (use a large value, e.g. 999, to simulate hang)
 //!   FAKE_MCP_RESULT_SIZE=N   — `tools/call` returns an N-byte text result
 //!                              (default: the literal "ok"); grows history
+//!   FAKE_MCP_RESULT_TEXT=s   — exact text returned by ordinary tools; takes
+//!                              precedence over `FAKE_MCP_RESULT_SIZE`
 //!   FAKE_MCP_IMAGE_RESULT=1  — `tools/call` returns text plus a PNG image block
 //!   FAKE_MCP_PID_FILE=path   — write the child PID to `path` on startup
 //!                              (for tests that want to verify the child died)
@@ -39,6 +41,8 @@
 //!                              `command` string. Lets a test drive the
 //!                              reply guard's recognition of a real,
 //!                              registered shell tool.
+//!   FAKE_MCP_BUZZ_REPLY_TOOL=1
+//!                            — expose the structured `buzz_reply` tool.
 
 use std::io::{BufRead, Write};
 
@@ -83,6 +87,7 @@ fn make_tools(
     include_stop_hook: bool,
     include_post_compact_hook: bool,
     include_shell_tool: bool,
+    include_buzz_reply_tool: bool,
 ) -> Vec<Value> {
     let mut tools: Vec<Value> = (0..count)
         .map(|i| {
@@ -115,6 +120,21 @@ fn make_tools(
                 "type": "object",
                 "properties": { "command": { "type": "string" } },
                 "required": ["command"],
+            },
+        }));
+    }
+    if include_buzz_reply_tool {
+        tools.push(json!({
+            "name": "buzz_reply",
+            "description": "publish the final reply to Buzz",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "channel": { "type": "string" },
+                    "content": { "type": "string" },
+                    "reply_to": { "type": "string" },
+                },
+                "required": ["channel", "content"],
             },
         }));
     }
@@ -155,6 +175,7 @@ fn main() {
     let mut stop_calls_seen: usize = 0;
     let post_compact_hook = env_flag("FAKE_MCP_POSTCOMPACT_HOOK");
     let shell_tool = env_flag("FAKE_MCP_SHELL_TOOL");
+    let buzz_reply_tool = env_flag("FAKE_MCP_BUZZ_REPLY_TOOL");
     let post_compact_text = std::env::var("FAKE_MCP_POSTCOMPACT_TEXT").unwrap_or_default();
 
     // Use a channel-based stdin reader so notifications (which carry no id)
@@ -231,6 +252,7 @@ fn main() {
                             stop_hook,
                             post_compact_hook,
                             shell_tool,
+                            buzz_reply_tool,
                         )
                     }),
                 );
@@ -296,7 +318,9 @@ fn main() {
                 if tool_delay_secs > 0 {
                     std::thread::sleep(std::time::Duration::from_secs(tool_delay_secs));
                 }
-                let result_text = if result_size > 0 {
+                let result_text = if let Ok(text) = std::env::var("FAKE_MCP_RESULT_TEXT") {
+                    text
+                } else if result_size > 0 {
                     "x".repeat(result_size)
                 } else {
                     "ok".to_owned()

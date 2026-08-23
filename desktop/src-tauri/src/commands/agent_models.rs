@@ -272,6 +272,7 @@ pub async fn discover_agent_models(
                     description: None,
                 })
                 .collect(),
+            model_tool_support: BTreeMap::new(),
             agent_default_model: None,
             selected_model: None,
             supports_switching: true,
@@ -344,6 +345,14 @@ use openrouter::{
     filter_openrouter_models, is_openrouter_provider, openrouter_models_url,
     OpenRouterModelListItem, OpenRouterModelListResponse,
 };
+
+#[path = "agent_models_ollama.rs"]
+mod ollama;
+use ollama::enrich_ollama_models;
+
+#[path = "agent_models_huggingface.rs"]
+pub(crate) mod huggingface;
+use huggingface::{is_huggingface_provider, parse_huggingface_models};
 
 fn is_openai_compatible_provider(provider: Option<&str>) -> bool {
     provider
@@ -553,19 +562,35 @@ async fn discover_openai_compatible_models(
         return Err(format!("OpenAI model discovery HTTP {status}: {body}"));
     }
 
-    let response = response
-        .json::<OpenAiModelListResponse>()
+    let body = response
+        .bytes()
         .await
-        .map_err(|error| format!("OpenAI model discovery response parse failed: {error}"))?;
-    let models = normalize_openai_compatible_models(response, provider.as_deref());
+        .map_err(|error| format!("OpenAI model discovery response read failed: {error}"))?;
+    let huggingface = is_huggingface_provider(provider_id);
+    let models = if huggingface {
+        parse_huggingface_models(&body).map_err(|error| {
+            format!("Hugging Face model discovery response parse failed: {error}")
+        })?
+    } else {
+        let response = serde_json::from_slice::<OpenAiModelListResponse>(&body)
+            .map_err(|error| format!("OpenAI model discovery response parse failed: {error}"))?;
+        normalize_openai_compatible_models(response, provider.as_deref())
+    };
+    let (models, model_tool_support) = enrich_ollama_models(provider, env, models).await;
     if models.is_empty() {
-        return Err("OpenAI model discovery returned no compatible text models".to_string());
+        let message = if huggingface {
+            "Hugging Face model discovery returned no live tool-capable provider routes"
+        } else {
+            "OpenAI model discovery returned no compatible text models"
+        };
+        return Err(message.to_string());
     }
 
     Ok(Some(AgentModelsResponse {
         agent_name: provider.as_deref().unwrap_or("openai").trim().to_string(),
         agent_version: "models-api".to_string(),
         models,
+        model_tool_support,
         agent_default_model: None,
         selected_model,
         supports_switching: true,
@@ -712,6 +737,7 @@ async fn discover_anthropic_models(
             .to_string(),
         agent_version: "models-api".to_string(),
         models,
+        model_tool_support: BTreeMap::new(),
         agent_default_model: None,
         selected_model,
         supports_switching: true,
@@ -808,6 +834,7 @@ pub(super) fn normalize_agent_models(
         agent_name,
         agent_version,
         models,
+        model_tool_support: BTreeMap::new(),
         agent_default_model,
         selected_model: persisted_model,
         supports_switching,

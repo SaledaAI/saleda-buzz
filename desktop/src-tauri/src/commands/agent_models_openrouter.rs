@@ -105,6 +105,7 @@ pub(super) fn filter_openrouter_models(
         agent_name: "openrouter".to_string(),
         agent_version: "models-api".to_string(),
         models,
+        model_tool_support: BTreeMap::new(),
         agent_default_model: None,
         selected_model,
         supports_switching: true,

@@ -77,6 +77,18 @@ pub struct ProviderProfile {
     pub openai_api_default: OpenAiApiDefault,
     /// Whether reasoning-effort fields are verified for this provider.
     pub supports_reasoning_effort: bool,
+    /// Output-token limit used when the operator does not provide an explicit
+    /// `BUZZ_AGENT_MAX_OUTPUT_TOKENS` override.
+    pub default_max_output_tokens: u32,
+    /// Whether managed turns must finish with a successfully accepted Buzz
+    /// message unless explicitly disabled by `BUZZ_AGENT_REQUIRE_REPLY=0`.
+    pub require_reply_by_default: bool,
+    /// Whether exhausting the reply guard is a terminal delivery error instead
+    /// of the legacy advisory end-turn behavior.
+    pub enforce_reply_delivery_by_default: bool,
+    /// Whether Chat Completions for this profile accepts a named function
+    /// `tool_choice` on a reply-guard retry.
+    pub supports_required_tool_choice: bool,
     /// Whether the profile is offered for Buzz Agent.
     pub supports_buzz_agent: bool,
 }
@@ -104,6 +116,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxCompletionTokens,
         openai_api_default: OpenAiApiDefault::Auto,
         supports_reasoning_effort: true,
+        default_max_output_tokens: 65_536,
+        require_reply_by_default: false,
+        enforce_reply_delivery_by_default: false,
+        supports_required_tool_choice: false,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -122,6 +138,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxCompletionTokens,
         openai_api_default: OpenAiApiDefault::Auto,
         supports_reasoning_effort: true,
+        default_max_output_tokens: 65_536,
+        require_reply_by_default: false,
+        enforce_reply_delivery_by_default: false,
+        supports_required_tool_choice: false,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -140,6 +160,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxCompletionTokens,
         openai_api_default: OpenAiApiDefault::Auto,
         supports_reasoning_effort: true,
+        default_max_output_tokens: 65_536,
+        require_reply_by_default: false,
+        enforce_reply_delivery_by_default: false,
+        supports_required_tool_choice: false,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -155,6 +179,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxCompletionTokens,
         openai_api_default: OpenAiApiDefault::Chat,
         supports_reasoning_effort: true,
+        default_max_output_tokens: 65_536,
+        require_reply_by_default: false,
+        enforce_reply_delivery_by_default: false,
+        supports_required_tool_choice: false,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -170,6 +198,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxTokens,
         openai_api_default: OpenAiApiDefault::Chat,
         supports_reasoning_effort: false,
+        default_max_output_tokens: 4_096,
+        require_reply_by_default: true,
+        enforce_reply_delivery_by_default: true,
+        supports_required_tool_choice: true,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -189,6 +221,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxTokens,
         openai_api_default: OpenAiApiDefault::Chat,
         supports_reasoning_effort: false,
+        default_max_output_tokens: 4_096,
+        require_reply_by_default: true,
+        enforce_reply_delivery_by_default: true,
+        supports_required_tool_choice: true,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -204,6 +240,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxCompletionTokens,
         openai_api_default: OpenAiApiDefault::Chat,
         supports_reasoning_effort: true,
+        default_max_output_tokens: 65_536,
+        require_reply_by_default: false,
+        enforce_reply_delivery_by_default: false,
+        supports_required_tool_choice: false,
         supports_buzz_agent: true,
     },
     ProviderProfile {
@@ -219,6 +259,10 @@ pub const PROVIDER_PROFILES: &[ProviderProfile] = &[
         chat_token_limit: ChatTokenLimitField::MaxCompletionTokens,
         openai_api_default: OpenAiApiDefault::Chat,
         supports_reasoning_effort: true,
+        default_max_output_tokens: 65_536,
+        require_reply_by_default: false,
+        enforce_reply_delivery_by_default: false,
+        supports_required_tool_choice: false,
         supports_buzz_agent: true,
     },
 ];
@@ -256,6 +300,10 @@ mod tests {
             assert_eq!(profile.openai_api_default, OpenAiApiDefault::Chat);
             assert_eq!(profile.chat_token_limit, ChatTokenLimitField::MaxTokens);
             assert!(!profile.supports_reasoning_effort);
+            assert_eq!(profile.default_max_output_tokens, 4_096);
+            assert!(profile.require_reply_by_default);
+            assert!(profile.enforce_reply_delivery_by_default);
+            assert!(profile.supports_required_tool_choice);
         }
     }
 }

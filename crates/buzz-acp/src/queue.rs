@@ -1387,6 +1387,21 @@ fn format_context_hints(
     }
 }
 
+/// Format the concrete publish action for this turn.
+///
+/// Keeping this as a standalone prompt section makes the reply contract easy
+/// for agents (and retry guards) to find without re-deriving the destination
+/// from the surrounding conversation context.
+fn format_required_final_action(channel_id: Uuid, reply_target: &str) -> String {
+    format!(
+        "[Required Final Action]\n\
+         When this turn requires a reply, publish it through Buzz before ending; assistant text alone is not delivered.\n\
+         Preferred: call `buzz_reply` with \
+         `{{\"channel\":\"{channel_id}\",\"reply_to\":\"{reply_target}\",\"content\":\"<your reply>\"}}`.\n\
+         Fallback: `buzz messages send --channel {channel_id} --reply-to {reply_target} --content \"<your reply>\"`"
+    )
+}
+
 /// Format a conversation context section (thread or DM).
 fn format_conversation_context(
     ctx: &ConversationContext,
@@ -1532,6 +1547,7 @@ pub(crate) fn base_section(base_prompt: &str) -> String {
 /// 1. `[Context]` — scope, channel name, and contextual hints for the agent
 /// 2. `[Thread Context]` or `[Conversation Context]` — if fetched
 /// 3. `[Event]` / `[Buzz events]` — the triggering event(s)
+/// 4. `[Required Final Action]` — concrete structured-tool and CLI publish templates
 ///
 /// Each section is returned as its own block rather than one joined string so
 /// the observer frame's size trimmer (`fit_observer_event_to_budget`) elides
@@ -1561,7 +1577,7 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
         .map(|ci| ci.channel_type == "dm")
         .unwrap_or(false);
 
-    let mut sections: Vec<String> = Vec::with_capacity(7);
+    let mut sections: Vec<String> = Vec::with_capacity(8);
 
     // Standing context — base prompt, persona, team instructions, core memory
     // and canvas. Modern agents received all of it via the system role in
@@ -1589,17 +1605,18 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
     //   - top-level     → anchor to the triggering event (it becomes the root)
     // Agent↔agent turns get no forced anchor — deep nesting is intentional
     // there. DMs are always 1:1 with a human, so they always anchor.
+    let triggering_event_id = last_event.event.id.to_hex();
     let sender_pubkey = last_event.event.pubkey.to_hex();
     let reply_anchor = if is_dm {
         thread_tags
             .root_event_id
             .is_some()
-            .then(|| last_event.event.id.to_hex())
+            .then(|| triggering_event_id.clone())
     } else {
         resolve_reply_anchor(
             &sender_pubkey,
             &thread_tags,
-            &last_event.event.id.to_hex(),
+            &triggering_event_id,
             args.profile_lookup,
         )
     };
@@ -1685,6 +1702,13 @@ pub fn format_prompt(batch: &FlushBatch, args: &FormatPromptArgs<'_>) -> Vec<Str
     if has_cancelled {
         sections.push(framing.closing_note.to_string());
     }
+
+    // Always give the model a fully-resolved destination. Human-facing turns
+    // use the flat reply anchor above; agent-only turns and top-level DMs reply
+    // directly to the triggering event, preserving intentional deep nesting
+    // without asking the model to infer an event id from the prompt.
+    let reply_target = reply_anchor.as_deref().unwrap_or(&triggering_event_id);
+    sections.push(format_required_final_action(batch.channel_id, reply_target));
 
     sections
 }
@@ -2016,6 +2040,68 @@ mod tests {
         assert!(prompt.contains("Event ID:"));
         // Should NOT contain "--- Event 1 ---" (that's the multi-event format).
         assert!(!prompt.contains("--- Event 1 ---"));
+    }
+
+    #[test]
+    fn test_format_prompt_ends_with_concrete_required_final_action() {
+        let ch = Uuid::parse_str("00f1ccaf-1506-4dd7-9a0e-fa67e9e486ae").unwrap();
+        let event = make_event("Hello @agent");
+        let event_id = event.id.to_hex();
+        let batch = FlushBatch {
+            channel_id: ch,
+            events: vec![BatchEvent {
+                event,
+                prompt_tag: "@mention".into(),
+                received_at: Instant::now(),
+            }],
+            cancelled_events: vec![],
+            cancel_reason: None,
+        };
+
+        let sections = format_prompt(&batch, &FormatPromptArgs::default());
+        let action = sections.last().expect("required final action section");
+
+        assert_eq!(
+            action,
+            &format!(
+                "[Required Final Action]\n\
+                 When this turn requires a reply, publish it through Buzz before ending; assistant text alone is not delivered.\n\
+                 Preferred: call `buzz_reply` with \
+                 `{{\"channel\":\"{ch}\",\"reply_to\":\"{event_id}\",\"content\":\"<your reply>\"}}`.\n\
+                 Fallback: `buzz messages send --channel {ch} --reply-to {event_id} --content \"<your reply>\"`"
+            )
+        );
+    }
+
+    #[test]
+    fn test_required_final_action_uses_resolved_thread_root() {
+        let ch = Uuid::new_v4();
+        let root = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let event = make_event_with_tags(
+            "continue",
+            vec![vec!["e".into(), root.into(), "".into(), "reply".into()]],
+        );
+        let triggering_event_id = event.id.to_hex();
+        let batch = FlushBatch {
+            channel_id: ch,
+            events: vec![BatchEvent {
+                event,
+                prompt_tag: "@mention".into(),
+                received_at: Instant::now(),
+            }],
+            cancelled_events: vec![],
+            cancel_reason: None,
+        };
+
+        let sections = format_prompt(&batch, &FormatPromptArgs::default());
+        let action = sections.last().expect("required final action section");
+
+        assert!(action.contains(&format!("\"reply_to\":\"{root}\"")));
+        assert!(action.contains(&format!("--channel {ch} --reply-to {root}")));
+        assert!(
+            !action.contains(&triggering_event_id),
+            "human-facing thread replies must use the resolved root: {action}"
+        );
     }
 
     /// Helper: build a merged (cancel + re-prompt) batch with one cancelled
@@ -4384,17 +4470,17 @@ mod tests {
             description: None,
         };
 
-        let prompt = format_prompt(
+        let sections = format_prompt(
             &batch,
             &FormatPromptArgs {
                 channel_info: Some(&ci),
                 ..Default::default()
             },
-        )
-        .join("\n\n");
+        );
+        let context = sections.first().expect("context section");
         assert!(
-            !prompt.contains("--reply-to"),
-            "DM non-reply should NOT include reply instruction"
+            !context.contains("--reply-to"),
+            "DM non-reply context should NOT include a threading instruction"
         );
     }
 

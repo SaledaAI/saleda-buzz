@@ -73,6 +73,14 @@ impl Shim {
             git_env,
         })
     }
+
+    /// Absolute path to the bundled `buzz` multicall personality.
+    pub(crate) fn buzz_path(&self) -> PathBuf {
+        let path = self._dir.path().join("buzz");
+        #[cfg(windows)]
+        let path = path.with_extension("exe");
+        path
+    }
 }
 
 struct KeyInfo {

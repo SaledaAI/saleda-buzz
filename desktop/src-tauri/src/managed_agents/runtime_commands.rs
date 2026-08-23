@@ -228,12 +228,22 @@ pub(crate) fn start_managed_agent_runtime_pair_lazy(
 }
 
 #[tauri::command]
-pub fn start_managed_agent_runtime(
+pub async fn start_managed_agent_runtime(
     pubkey: String,
     relay_url: String,
     app: AppHandle,
 ) -> Result<ManagedAgentRuntimeStatus, String> {
-    start_managed_agent_runtime_pair_lazy(pubkey, relay_url, app)
+    let record = load_managed_agents(&app)?
+        .into_iter()
+        .find(|record| record.pubkey == pubkey)
+        .ok_or_else(|| format!("agent {pubkey} not found"))?;
+    super::preflight_agent_model(&app, &record).await?;
+    let expected_updated_at = record.updated_at;
+    tokio::task::spawn_blocking(move || {
+        start_pair(pubkey, relay_url, true, Some(&expected_updated_at), app)
+    })
+    .await
+    .map_err(|error| format!("spawn_blocking failed: {error}"))?
 }
 
 fn start_pair(
@@ -377,13 +387,22 @@ pub fn stop_managed_agent_runtime(
 }
 
 #[tauri::command]
-pub fn restart_managed_agent_runtime(
+pub async fn restart_managed_agent_runtime(
     pubkey: String,
     relay_url: String,
     app: AppHandle,
 ) -> Result<ManagedAgentRuntimeStatus, String> {
-    stop_managed_agent_runtime(pubkey.clone(), relay_url.clone(), app.clone())?;
-    start_pair(pubkey, relay_url, true, None, app)
+    let record = load_managed_agents(&app)?
+        .into_iter()
+        .find(|record| record.pubkey == pubkey)
+        .ok_or_else(|| format!("agent {pubkey} not found"))?;
+    super::preflight_agent_model(&app, &record).await?;
+    tokio::task::spawn_blocking(move || {
+        stop_managed_agent_runtime(pubkey.clone(), relay_url.clone(), app.clone())?;
+        start_pair(pubkey, relay_url, true, None, app)
+    })
+    .await
+    .map_err(|error| format!("spawn_blocking failed: {error}"))?
 }
 
 /// Probe whether this agent can operate on `requested_relay_url`.
@@ -479,9 +498,15 @@ pub async fn reconcile_managed_agent_runtimes(
     let probes: Vec<_> = stream::iter(jobs)
         .map(|(record, requested)| {
             let state = app.state::<AppState>();
+            let app = app.clone();
             async move {
                 let fallback_record = record.clone();
                 let fallback_requested = requested.clone();
+                super::preflight_agent_model(&app, &record)
+                    .await
+                    .map_err(|error| {
+                        (fallback_record.clone(), fallback_requested.clone(), error)
+                    })?;
                 probe_agent_relay_access(&state, record, requested)
                     .await
                     .map_err(|error| (fallback_record, fallback_requested, error))

@@ -492,6 +492,7 @@ export function AgentModelField({
 
   const modelOptions: AgentDropdownOption[] = [
     ...effectiveModelOptions.map((option) => ({
+      disabled: option.disabled,
       label: option.label,
       value: option.id || AUTO_MODEL_DROPDOWN_VALUE,
     })),

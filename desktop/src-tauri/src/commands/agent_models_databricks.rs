@@ -245,6 +245,7 @@ pub(super) async fn discover_databricks_models(
                 description: None,
             })
             .collect(),
+        model_tool_support: BTreeMap::new(),
         agent_default_model: None,
         selected_model,
         supports_switching: true,
