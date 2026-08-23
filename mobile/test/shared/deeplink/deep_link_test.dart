@@ -26,6 +26,19 @@ void main() {
       );
     });
 
+    test('accepts the Zorro scheme as a compatibility alias', () {
+      expect(
+        parseMessageDeepLink(
+          Uri.parse('zorro://message?channel=$channel&id=$id&thread=$thread'),
+        ),
+        const MessageDeepLink(
+          channelId: channel,
+          messageId: id,
+          threadRootId: thread,
+        ),
+      );
+    });
+
     test('rejects malformed or ambiguous forms', () {
       for (final url in [
         'buzz://message?id=$id',
@@ -100,6 +113,17 @@ void _channelTests() {
       }
     });
 
+    test('accepts the Zorro scheme as a compatibility alias', () {
+      expect(
+        parseChannelDeepLink(
+          Uri.parse('zorro://channel/580ca78b-9dae-46f3-8854-bd671853ba32'),
+        ),
+        const ChannelDeepLink(
+          channelId: '580ca78b-9dae-46f3-8854-bd671853ba32',
+        ),
+      );
+    });
+
     test('is included in the top-level parser', () {
       expect(
         parseBuzzDeepLink(
@@ -142,6 +166,21 @@ void _inviteTests() {
       final link = parseInviteDeepLink(
         Uri.parse(
           'buzz://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123',
+        ),
+      );
+      expect(
+        link,
+        const InviteDeepLink(
+          relayUrl: 'wss://relay.example.com',
+          code: 'abc123',
+        ),
+      );
+    });
+
+    test('parses zorro join handoff link', () {
+      final link = parseInviteDeepLink(
+        Uri.parse(
+          'zorro://join?relay=wss%3A%2F%2Frelay.example.com&code=abc123',
         ),
       );
       expect(
@@ -371,6 +410,15 @@ void _buildMessageLinkTests() {
           Uri.parse('buzz://issue?id=$id&owner=$owner&d=buzz'),
         )?.type,
         'issue',
+      );
+    });
+
+    test('accepts Zorro entity-link compatibility aliases', () {
+      expect(
+        parseEntityDeepLink(
+          Uri.parse('zorro://repo?owner=$owner&d=zorro'),
+        )?.repository,
+        'zorro',
       );
     });
 

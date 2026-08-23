@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installMockBridge } from "../helpers/bridge";
 
-const TERM = 'section[aria-label="Buzz Term"]';
+const TERM = 'section[aria-label="Zorro Term"]';
 const NAMED = 0x0100_0000;
 const FG = NAMED | 256;
 const BG = NAMED | 257;
@@ -240,7 +240,7 @@ test("terminal viewport click retains keyboard input ownership", async ({
     .toContain("FOCUS_KEYSTROKE");
 });
 
-test("concealed terminal viewport does not steal Buzz focus", async ({
+test("concealed terminal viewport does not steal Zorro focus", async ({
   page,
 }) => {
   await reveal(page);

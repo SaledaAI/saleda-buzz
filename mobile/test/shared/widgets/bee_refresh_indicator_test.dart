@@ -11,16 +11,16 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../helpers/widget_helpers.dart';
 
 void main() {
-  testWidgets('full eye progress fills each eye cutout to its edge', (
+  testWidgets('compatibility wrapper paints the Zorro hat without bee wings', (
     tester,
   ) async {
-    const beeKey = ValueKey('full-eye-bee');
+    const beeKey = ValueKey('zorro-hat-compatibility-wrapper');
     await tester.pumpWidget(
       const MaterialApp(
         home: Center(
           child: FlappingBee(
             key: beeKey,
-            width: 466,
+            width: 512,
             color: Colors.black,
             flapAmount: 0,
             eyeProgress: 1,
@@ -43,15 +43,18 @@ void main() {
     });
     expect(bytes, isNotNull);
 
-    int alphaAt(int x, int y) => bytes!.getUint8(((y * 466) + x) * 4 + 3);
+    int alphaAt(int x, int y) => bytes!.getUint8(((y * 512) + x) * 4 + 3);
 
-    // These points sit inside the 27px eye cutouts but outside the old 20px
-    // pupil radius, directly covering the light rings seen behind the emoji.
-    expect(alphaAt(217, 84), 255);
-    expect(alphaAt(300, 84), 255);
+    expect(alphaAt(256, 216), greaterThan(0), reason: 'crown is painted');
+    expect(alphaAt(256, 400), greaterThan(0), reason: 'brim is painted');
+    expect(
+      alphaAt(20, 154),
+      0,
+      reason: 'the former left-wing position should remain transparent',
+    );
   });
 
-  testWidgets('shows the bee while pulling to refresh', (tester) async {
+  testWidgets('shows the Zorro mark while pulling to refresh', (tester) async {
     const contentKey = ValueKey('loading-content');
     var refreshes = 0;
     final refreshCompleter = Completer<void>();
@@ -369,7 +372,9 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('keeps the bee static when motion is disabled', (tester) async {
+  testWidgets('keeps the Zorro mark static when motion is disabled', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MediaQuery(
         data: const MediaQueryData(disableAnimations: true),

@@ -887,7 +887,7 @@ mod relay_backed_tests {
     /// ```text
     /// ./scripts/start-isolated-test-relay.sh          # ws://localhost:3030
     /// BUZZ_TEST_RELAY_URL=ws://localhost:3030 \
-    ///   cargo test -p buzz-desktop -- --ignored archive_sync_session
+    ///   cargo test -p zorro-desktop -- --ignored archive_sync_session
     /// ```
     #[tokio::test]
     #[ignore = "requires a local relay (set BUZZ_TEST_RELAY_URL)"]

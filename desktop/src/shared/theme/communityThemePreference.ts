@@ -1,4 +1,5 @@
 import { normalizeRelayUrl } from "@/features/profile/lib/selfProfileStorage";
+import { PRODUCT_THEME } from "@/shared/brand";
 import { ACCENT_COLORS } from "./ThemeProvider";
 import { SYNTAX_THEMES, type SyntaxThemeName } from "./theme-loader";
 
@@ -15,7 +16,7 @@ export type CommunityThemePreference = {
 
 export const DEFAULT_COMMUNITY_THEME: CommunityThemePreference = Object.freeze({
   version: 1,
-  theme: "buzz",
+  theme: PRODUCT_THEME.light,
   accent: "#3b82f6",
   followSystem: true,
 });

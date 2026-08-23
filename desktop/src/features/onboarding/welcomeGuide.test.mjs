@@ -71,8 +71,8 @@ test("pickWelcomeGuideAgent reuses a legacy Kit guide", () => {
   assert.equal(pickWelcomeGuideAgent([legacyKit]), legacyKit);
 });
 
-test("pickWelcomeGuideAgent prefers a running legacy guide over stopped builtin Fizz", () => {
-  const stoppedBuiltinFizz = makeAgent({
+test("pickWelcomeGuideAgent prefers a running legacy guide over stopped builtin Diego", () => {
+  const stoppedBuiltinDiego = makeAgent({
     pubkey: PUB_A,
     personaId: WELCOME_GUIDE_PERSONA_ID,
     status: "stopped",
@@ -85,7 +85,7 @@ test("pickWelcomeGuideAgent prefers a running legacy guide over stopped builtin 
   });
 
   assert.equal(
-    pickWelcomeGuideAgent([stoppedBuiltinFizz, runningLegacyKit]),
+    pickWelcomeGuideAgent([stoppedBuiltinDiego, runningLegacyKit]),
     runningLegacyKit,
   );
 });
@@ -96,22 +96,22 @@ test("pickWelcomeGuideAgent ignores non-Kit agents with the legacy prompt", () =
     name: "Scout",
     systemPrompt: LEGACY_WELCOME_GUIDE_SYSTEM_PROMPT,
   });
-  const fizz = makeAgent({
+  const diego = makeAgent({
     pubkey: PUB_C,
     personaId: WELCOME_GUIDE_PERSONA_ID,
   });
 
-  assert.equal(pickWelcomeGuideAgent([nonKit, fizz]), fizz);
+  assert.equal(pickWelcomeGuideAgent([nonKit, diego]), diego);
 });
 
-test("pickWelcomeGuideAgentForRelay ignores Fizz agents from other communities", () => {
-  const otherCommunityFizz = makeAgent({
+test("pickWelcomeGuideAgentForRelay ignores Diego agents from other communities", () => {
+  const otherCommunityDiego = makeAgent({
     pubkey: PUB_A,
     personaId: WELCOME_GUIDE_PERSONA_ID,
     relayUrl: RELAY_A,
     status: "running",
   });
-  const currentCommunityFizz = makeAgent({
+  const currentCommunityDiego = makeAgent({
     pubkey: PUB_B,
     personaId: WELCOME_GUIDE_PERSONA_ID,
     relayUrl: RELAY_B,
@@ -120,22 +120,22 @@ test("pickWelcomeGuideAgentForRelay ignores Fizz agents from other communities",
 
   assert.equal(
     pickWelcomeGuideAgentForRelay(
-      [otherCommunityFizz, currentCommunityFizz],
+      [otherCommunityDiego, currentCommunityDiego],
       RELAY_B,
     ),
-    currentCommunityFizz,
+    currentCommunityDiego,
   );
 });
 
-test("pickWelcomeGuideAgentForRelay returns null when Fizz only exists in another community", () => {
-  const otherCommunityFizz = makeAgent({
+test("pickWelcomeGuideAgentForRelay returns null when Diego only exists in another community", () => {
+  const otherCommunityDiego = makeAgent({
     pubkey: PUB_A,
     personaId: WELCOME_GUIDE_PERSONA_ID,
     relayUrl: RELAY_A,
   });
 
   assert.equal(
-    pickWelcomeGuideAgentForRelay([otherCommunityFizz], RELAY_B),
+    pickWelcomeGuideAgentForRelay([otherCommunityDiego], RELAY_B),
     null,
   );
 });
@@ -145,7 +145,7 @@ test("starter persona activation is serialized to protect the shared store", asy
   let activeWrites = 0;
 
   await activateWelcomeTeamPersonasSequentially(
-    ["builtin:fizz", "builtin:honey", "builtin:bumble"],
+    ["builtin:diego", "builtin:murietta", "builtin:montero"],
     async (personaId) => {
       assert.equal(activeWrites, 0, "activation writes must never overlap");
       activeWrites += 1;
@@ -155,7 +155,11 @@ test("starter persona activation is serialized to protect the shared store", asy
     },
   );
 
-  assert.deepEqual(calls, ["builtin:fizz", "builtin:honey", "builtin:bumble"]);
+  assert.deepEqual(calls, [
+    "builtin:diego",
+    "builtin:murietta",
+    "builtin:montero",
+  ]);
 });
 
 test("all Welcome starters use the onboarding runtime preference", async () => {
@@ -176,7 +180,7 @@ test("all Welcome starters use the onboarding runtime preference", async () => {
   const buzzAgent = {
     ...claude,
     id: "buzz-agent",
-    label: "Buzz Agent",
+    label: "Zorro Agent",
     command: "buzz-agent",
   };
 
@@ -224,7 +228,7 @@ test("existing Welcome starter rematerializes runtime-specific fields atomically
 
   assert.deepEqual(
     welcomeStarterRuntimeUpdate(existing, {
-      name: "Fizz",
+      name: "Diego",
       agentCommand: "codex-acp",
       agentArgs: ["--new"],
       mcpCommand: "buzz-dev-mcp",
@@ -254,7 +258,7 @@ test("existing Welcome starter clears stale model and provider for Claude", () =
 
   assert.deepEqual(
     welcomeStarterRuntimeUpdate(existing, {
-      name: "Fizz",
+      name: "Diego",
       agentCommand: "claude-agent-acp",
       agentArgs: [],
       mcpCommand: "",
@@ -280,7 +284,7 @@ test("existing Welcome starter needs no update when runtime already matches", ()
 
   assert.equal(
     welcomeStarterRuntimeUpdate(existing, {
-      name: "Fizz",
+      name: "Diego",
       agentCommand: "codex-acp",
       agentArgs: ["--same"],
       mcpCommand: "buzz-dev-mcp",
@@ -294,52 +298,52 @@ test("existing Welcome starter needs no update when runtime already matches", ()
 test("welcome team starter definitions and role identities are stable", () => {
   assert.equal(WELCOME_TEAM_ID, "builtin-team:welcome");
   assert.deepEqual(WELCOME_TEAM_STARTERS, [
-    { name: "Fizz", personaId: "builtin:fizz", role: "lead" },
-    { name: "Honey", personaId: "builtin:honey", role: "teammate" },
-    { name: "Pollen", personaId: "builtin:bumble", role: "teammate" },
+    { name: "Diego", personaId: "builtin:diego", role: "lead" },
+    { name: "Murietta", personaId: "builtin:murietta", role: "teammate" },
+    { name: "Montero", personaId: "builtin:montero", role: "teammate" },
   ]);
 });
 
 test("starter matching ignores user agents with a Welcome persona", () => {
-  const honey = WELCOME_TEAM_STARTERS[1];
-  const userHoney = makeAgent({
-    personaId: honey.personaId,
+  const murietta = WELCOME_TEAM_STARTERS[1];
+  const userMurietta = makeAgent({
+    personaId: murietta.personaId,
     teamId: null,
   });
 
   assert.equal(
-    pickWelcomeTeamStarterAgentForRelay([userHoney], honey, RELAY_A),
+    pickWelcomeTeamStarterAgentForRelay([userMurietta], murietta, RELAY_A),
     null,
   );
 });
 
 test("starter matching uses persona identity rather than display name", () => {
-  const honey = WELCOME_TEAM_STARTERS[1];
-  const renamedHoney = makeAgent({
-    name: "Honey the Helper",
-    personaId: honey.personaId,
+  const murietta = WELCOME_TEAM_STARTERS[1];
+  const renamedMurietta = makeAgent({
+    name: "Murietta the Helper",
+    personaId: murietta.personaId,
   });
-  const nameOnlyHoney = makeAgent({ name: honey.name, pubkey: PUB_B });
+  const nameOnlyMurietta = makeAgent({ name: murietta.name, pubkey: PUB_B });
 
   assert.equal(
     pickWelcomeTeamStarterAgentForRelay(
-      [nameOnlyHoney, renamedHoney],
-      honey,
+      [nameOnlyMurietta, renamedMurietta],
+      murietta,
       RELAY_A,
     ),
-    renamedHoney,
+    renamedMurietta,
   );
 });
 
 test("starter matching is relay scoped and normalizes trailing slashes", () => {
-  const pollen = WELCOME_TEAM_STARTERS[2];
+  const montero = WELCOME_TEAM_STARTERS[2];
   const otherRelay = makeAgent({
-    personaId: pollen.personaId,
+    personaId: montero.personaId,
     relayUrl: RELAY_B,
     status: "running",
   });
   const matchingRelay = makeAgent({
-    personaId: pollen.personaId,
+    personaId: montero.personaId,
     relayUrl: `${RELAY_A}/`,
     pubkey: PUB_B,
   });
@@ -347,7 +351,7 @@ test("starter matching is relay scoped and normalizes trailing slashes", () => {
   assert.equal(
     pickWelcomeTeamStarterAgentForRelay(
       [otherRelay, matchingRelay],
-      pollen,
+      montero,
       RELAY_A,
     ),
     matchingRelay,
@@ -355,15 +359,15 @@ test("starter matching is relay scoped and normalizes trailing slashes", () => {
 });
 
 test("starter matching prefers running, then deployed instances", () => {
-  const fizz = WELCOME_TEAM_STARTERS[0];
-  const stopped = makeAgent({ personaId: fizz.personaId });
+  const diego = WELCOME_TEAM_STARTERS[0];
+  const stopped = makeAgent({ personaId: diego.personaId });
   const deployed = makeAgent({
-    personaId: fizz.personaId,
+    personaId: diego.personaId,
     pubkey: PUB_B,
     status: "deployed",
   });
   const running = makeAgent({
-    personaId: fizz.personaId,
+    personaId: diego.personaId,
     pubkey: PUB_C,
     status: "running",
   });
@@ -371,13 +375,13 @@ test("starter matching prefers running, then deployed instances", () => {
   assert.equal(
     pickWelcomeTeamStarterAgentForRelay(
       [stopped, deployed, running],
-      fizz,
+      diego,
       RELAY_A,
     ),
     running,
   );
   assert.equal(
-    pickWelcomeTeamStarterAgentForRelay([stopped, deployed], fizz, RELAY_A),
+    pickWelcomeTeamStarterAgentForRelay([stopped, deployed], diego, RELAY_A),
     deployed,
   );
 });

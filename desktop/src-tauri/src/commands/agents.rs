@@ -66,10 +66,10 @@ fn normalize_relay_mesh(
 
     let model_ref = config.model_ref.trim();
     if model_ref.is_empty() {
-        return Err("Buzz shared compute model is required".to_string());
+        return Err("Zorro shared compute model is required".to_string());
     }
     if backend != &BackendKind::Local {
-        return Err("Buzz shared compute agents must use the local backend".to_string());
+        return Err("Zorro shared compute agents must use the local backend".to_string());
     }
 
     Ok(Some(RelayMeshConfig {
@@ -1027,7 +1027,7 @@ pub async fn start_managed_agent(
                     .await
             {
                 eprintln!(
-                    "buzz-desktop: profile reconciliation failed for agent {reconcile_pubkey}: {e}"
+                    "zorro-desktop: profile reconciliation failed for agent {reconcile_pubkey}: {e}"
                 );
             }
         });

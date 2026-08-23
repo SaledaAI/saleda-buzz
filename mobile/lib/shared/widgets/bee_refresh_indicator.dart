@@ -9,22 +9,22 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../theme/theme.dart';
 import 'flapping_bee.dart';
 
-/// Replaces the standard pull-to-refresh spinner with Buzz's loading bee.
+/// Replaces the standard pull-to-refresh spinner with Zorro's animated hat.
 ///
 /// Flutter continues to own the gesture, refresh lifecycle, and accessibility
 /// semantics. This widget maps those states into the elastic pull, retained
-/// loading gap, and bee animation.
+/// loading gap, and strike animation.
 class BeeRefreshIndicator extends HookConsumerWidget {
   /// Called when the user completes a pull, to load fresh data.
   ///
-  /// The bee keeps flapping until this future settles, so it should complete
+  /// The mark keeps animating until this future settles, so it should complete
   /// only once the refresh is done.
   final Future<void> Function() onRefresh;
 
   /// The scrollable this indicator wraps.
   ///
   /// It must scroll vertically; the indicator reads its scroll notifications
-  /// to couple the bee to the user's finger.
+  /// to couple the mark to the user's finger.
   final Widget child;
 
   /// The vertical offset of the scrollable's top edge, such as a pinned header.
@@ -38,7 +38,7 @@ class BeeRefreshIndicator extends HookConsumerWidget {
   });
 
   static const _beeWidth = 60.0;
-  static const _beeHeight = _beeWidth * 309 / 466;
+  static const _beeHeight = _beeWidth;
   static const _triggerDistance = 100.0;
   static const _loadingGap = 72.0;
   static const _beeVerticalAlignment = 0.75;
@@ -202,7 +202,7 @@ class BeeRefreshIndicator extends HookConsumerWidget {
       if (notification is! ScrollStartNotification &&
           notification.metrics.extentBefore == 0) {
         // BouncingScrollPhysics reports a live negative scroll position while
-        // the user is pulling. Reading it keeps the bee coupled to the finger.
+        // the user is pulling. Reading it keeps the mark coupled to the finger.
         final elasticPull =
             (notification.metrics.minScrollExtent - notification.metrics.pixels)
                 .clamp(0.0, double.infinity)

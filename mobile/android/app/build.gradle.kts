@@ -119,7 +119,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        resValue("string", "app_name", "Buzz")
+        resValue("string", "app_name", "Zorro")
     }
 
     signingConfigs {
@@ -143,7 +143,7 @@ android {
             val resolvedAppName =
                 debugAppName
                     ?: worktreeAppName
-                    ?: worktreeLabel?.let { "Buzz ($it)" }
+                    ?: worktreeLabel?.let { "Zorro ($it)" }
             if (resolvedAppName != null) {
                 resValue("string", "app_name", resolvedAppName)
             }

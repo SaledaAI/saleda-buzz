@@ -4644,7 +4644,7 @@ void main() {
       expect(relaySession.publishedKinds, isEmpty);
     });
 
-    testWidgets('shows the flapping bee instead of an avatar while joining', (
+    testWidgets('shows the Zorro mark instead of an avatar while joining', (
       tester,
     ) async {
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -4677,26 +4677,28 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      final loadingBee = find.byKey(const ValueKey('huddle-loading-bee'));
-      expect(loadingBee, findsOneWidget);
-      expect(find.byType(FlappingBee), findsOneWidget);
-      expect(tester.widget<FlappingBee>(loadingBee).width, 60);
+      final loadingMark = find.byKey(const ValueKey('huddle-loading-mark'));
+      expect(loadingMark, findsOneWidget);
+      expect(find.byType(ZorroHatMark), findsOneWidget);
+      expect(tester.widget<ZorroHatMark>(loadingMark).width, 60);
       expect(find.bySemanticsLabel('Joining Huddle'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('huddle-participant-avatar-self')),
         findsNothing,
       );
-      final initialFlap = tester.widget<FlappingBee>(loadingBee).flapAmount;
+      final initialStrike = tester
+          .widget<ZorroHatMark>(loadingMark)
+          .strikeAmount;
       await tester.pump(const Duration(milliseconds: 120));
       expect(
-        tester.widget<FlappingBee>(loadingBee).flapAmount,
-        isNot(initialFlap),
+        tester.widget<ZorroHatMark>(loadingMark).strikeAmount,
+        isNot(initialStrike),
       );
 
       connectGate.complete();
       await tester.pumpAndSettle();
 
-      expect(loadingBee, findsNothing);
+      expect(loadingMark, findsNothing);
       expect(
         find.byKey(const ValueKey('huddle-participant-avatar-self')),
         findsOneWidget,

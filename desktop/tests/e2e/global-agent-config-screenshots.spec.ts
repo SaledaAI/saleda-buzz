@@ -62,14 +62,14 @@ async function selectDropdownOption(
 const CATALOG_WITH_CLAUDE = [
   {
     id: "buzz-agent",
-    label: "Buzz Agent",
+    label: "Zorro Agent",
     avatar_url: "",
     availability: "available",
     command: "buzz-agent",
     binary_path: "/usr/local/bin/buzz-agent",
     default_args: [],
     mcp_command: "buzz-dev-mcp",
-    install_hint: "Ships with the Buzz desktop app.",
+    install_hint: "Ships with the Zorro desktop app.",
     install_instructions_url: "https://github.com/block/buzz",
     can_auto_install: false,
     underlying_cli_path: null,
@@ -98,14 +98,14 @@ const CATALOG_WITH_CLAUDE = [
 const CATALOG_WITH_CODEX = [
   {
     id: "buzz-agent",
-    label: "Buzz Agent",
+    label: "Zorro Agent",
     avatar_url: "",
     availability: "available",
     command: "buzz-agent",
     binary_path: "/usr/local/bin/buzz-agent",
     default_args: [],
     mcp_command: "buzz-dev-mcp",
-    install_hint: "Ships with the Buzz desktop app.",
+    install_hint: "Ships with the Zorro desktop app.",
     install_instructions_url: "https://github.com/block/buzz",
     can_auto_install: false,
     underlying_cli_path: null,
@@ -133,14 +133,14 @@ const CATALOG_WITH_CODEX = [
 const CATALOG_NONE_AVAILABLE = [
   {
     id: "buzz-agent",
-    label: "Buzz Agent",
+    label: "Zorro Agent",
     avatar_url: "",
     availability: "not_installed",
     command: "buzz-agent",
     binary_path: null,
     default_args: [],
     mcp_command: "buzz-dev-mcp",
-    install_hint: "Ships with the Buzz desktop app.",
+    install_hint: "Ships with the Zorro desktop app.",
     install_instructions_url: "https://github.com/block/buzz",
     can_auto_install: false,
     underlying_cli_path: null,
@@ -482,7 +482,7 @@ test.describe("global agent config screenshots", () => {
     );
 
     const harness = defaultsDialog.getByTestId("global-agent-default-harness");
-    await expect(harness).toHaveText("Buzz Agent");
+    await expect(harness).toHaveText("Zorro Agent");
     const provider = defaultsDialog.getByTestId("global-agent-provider");
     await expect(provider).toBeVisible();
     await waitForAnimations(page);
@@ -557,7 +557,7 @@ test.describe("global agent config screenshots", () => {
     });
   });
 
-  test("unset defaults persist the visible Buzz Agent fallback", async ({
+  test("unset defaults persist the visible Zorro Agent fallback", async ({
     page,
   }) => {
     await installMockBridge(page);
@@ -570,7 +570,7 @@ test.describe("global agent config screenshots", () => {
     const defaultsDialog = page.getByTestId("agent-ai-defaults-dialog");
     await expect(
       defaultsDialog.getByTestId("global-agent-default-harness"),
-    ).toHaveText("Buzz Agent");
+    ).toHaveText("Zorro Agent");
 
     await defaultsDialog.getByTestId("global-agent-provider").click();
     await page.getByTestId("global-agent-provider-option-anthropic").click();
@@ -612,7 +612,7 @@ test.describe("global agent config screenshots", () => {
     await openCreateDialog(page);
 
     const defaults = page.getByTestId("agent-ai-defaults-notice");
-    await expect(defaults).toContainText("Buzz Agent");
+    await expect(defaults).toContainText("Zorro Agent");
     await defaults
       .getByRole("button", { name: "Edit global defaults" })
       .click();
@@ -690,13 +690,13 @@ test.describe("global agent config screenshots", () => {
     await expect(harness).toBeVisible();
     await expect(harness).toContainText("Choose a harness");
 
-    await selectDropdownOption(page, harness, "Buzz Agent (not installed)");
+    await selectDropdownOption(page, harness, "Zorro Agent (not installed)");
     await expect(
       customSection
         .locator("p")
-        .filter({ hasText: "Buzz Agent is not installed." }),
+        .filter({ hasText: "Zorro Agent is not installed." }),
     ).toContainText(
-      "Buzz Agent is not installed. Ships with the Buzz desktop app. Visit Settings > Agents to set it up.",
+      "Zorro Agent is not installed. Ships with the Zorro desktop app. Visit Settings > Agents to set it up.",
     );
     await expect(page.getByTestId("persona-dialog-submit")).toBeDisabled();
   });
@@ -740,7 +740,7 @@ test.describe("global agent config screenshots", () => {
       defaultsSection.getByText("Harness", { exact: true }),
     ).toBeVisible();
     await expect(
-      defaultsSection.getByText("Buzz Agent", { exact: true }),
+      defaultsSection.getByText("Zorro Agent", { exact: true }),
     ).toBeVisible();
 
     // Global provider satisfies the provider-default rule → submit enabled.

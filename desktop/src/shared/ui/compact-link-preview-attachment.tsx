@@ -12,8 +12,8 @@ import {
   AttachmentTrigger,
 } from "@/shared/ui/attachment";
 import { LinkPreviewControls } from "@/shared/ui/link-preview-controls";
-import { BuzzMark } from "@/shared/ui/buzz-logo/BuzzMark";
 import { useSmoothCorners } from "@/shared/ui/smoothCorners";
+import { ZorroHat } from "@/shared/ui/zorro-logo/ZorroHat";
 
 function getHostname(preview: ResolvedLinkPreview): string {
   if (preview.href.startsWith("buzz://")) return preview.provider;
@@ -76,7 +76,7 @@ export function CompactLinkPreviewAttachment({
   const showFallback =
     preview.imageState === "fallback" || Boolean(imageSrc && !showImage);
   const hostname = getHostname(preview);
-  const showBuzzMark =
+  const showZorroHat =
     preview.kind === "buzz-pull-request" ||
     preview.kind === "buzz-issue" ||
     preview.kind === "buzz-repository";
@@ -135,13 +135,13 @@ export function CompactLinkPreviewAttachment({
             rel="noreferrer"
             target="_blank"
           >
-            {showBuzzMark ? (
+            {showZorroHat ? (
               <span
                 aria-hidden="true"
                 className="flex size-3 shrink-0 items-center text-foreground/70"
                 data-link-preview-hostname-buzz-mark=""
               >
-                <BuzzMark className="h-auto w-full" />
+                <ZorroHat className="h-auto w-full" />
               </span>
             ) : preview.faviconDataUrl ? (
               <img

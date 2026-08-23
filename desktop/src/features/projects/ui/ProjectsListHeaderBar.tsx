@@ -7,6 +7,7 @@ import type {
 } from "@/features/projects/lib/projectsViewHelpers";
 import { ProjectsListScopeDropdown } from "@/features/projects/ui/ProjectsListScopeDropdown";
 import { ProjectsViewModeToggle } from "@/features/projects/ui/ProjectsToolbar";
+import { PRODUCT_NAME } from "@/shared/brand";
 
 const PROJECT_SCOPE_OPTIONS: Array<{
   label: string;
@@ -25,7 +26,7 @@ const REPOSITORY_SCOPE_OPTIONS: Array<{
   { label: "Accessible", value: "accessible" },
   { label: "My Repositories", value: "mine" },
   { label: "Local", value: "local" },
-  { label: "Buzz-hosted", value: "buzz" },
+  { label: `${PRODUCT_NAME}-hosted`, value: "buzz" },
   { label: "Linked", value: "linked" },
 ];
 const PULL_REQUEST_SCOPE_OPTIONS: Array<{

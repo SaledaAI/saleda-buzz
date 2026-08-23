@@ -7,9 +7,9 @@ mod cli_tests;
 
 #[test]
 fn appimage_binary_matches_truncated_linux_comm_name() {
+    assert!(super::is_desktop_binary("zorro-desktop.b"));
     assert!(super::is_desktop_binary("buzz-desktop.bi"));
 }
-
 // ── buffer_contains_identifier tests ────────────────────────────────────
 
 #[test]

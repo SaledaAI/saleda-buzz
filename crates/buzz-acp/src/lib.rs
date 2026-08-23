@@ -3661,7 +3661,7 @@ fn try_native_steer(
         received_at: std::time::Instant::now(),
     };
     let event_block = queue::format_event_block(channel_id, None, &be, None);
-    let body = format!("{header}\n\n[Buzz event: {prompt_tag}]\n{event_block}\n\n{closing}");
+    let body = format!("{header}\n\n[Zorro event: {prompt_tag}]\n{event_block}\n\n{closing}");
 
     let (ack_tx, ack_rx) = tokio::sync::oneshot::channel::<pool::SteerAck>();
     let request = pool::SteerRequest {
@@ -8550,7 +8550,7 @@ mod observer_payload_trim_tests {
             "[Agent Memory — core]\nremember this".to_string(),
             "[Context]\nScope: thread".to_string(),
             // The triggering event body, oversized on its own.
-            format!("[Buzz event: @mention]\nContent: {}", "E".repeat(90_000)),
+            format!("[Zorro event: @mention]\nContent: {}", "E".repeat(90_000)),
         ];
         let block_refs: Vec<&str> = sections.iter().map(String::as_str).collect();
         // Mirror the wire shape build_prompt_params produces: each block is its
@@ -8586,7 +8586,7 @@ mod observer_payload_trim_tests {
             "[Agent Instructions]",
             "[Agent Memory — core]",
             "[Context]",
-            "[Buzz event: @mention]",
+            "[Zorro event: @mention]",
         ] {
             assert!(
                 texts.iter().any(|t| t.starts_with(header)),
@@ -8596,7 +8596,7 @@ mod observer_payload_trim_tests {
         // The oversized event body was elided in place (header kept, middle cut).
         let event_block = texts
             .iter()
-            .find(|t| t.starts_with("[Buzz event: @mention]"))
+            .find(|t| t.starts_with("[Zorro event: @mention]"))
             .unwrap();
         assert!(
             event_block.contains("…[elided"),

@@ -20,17 +20,18 @@ import type {
   ManagedAgent,
   UpdateManagedAgentInput,
 } from "@/shared/api/types";
+import { STARTER_AGENT_BRAND } from "@/shared/brand";
 import { normalizePubkey } from "@/shared/lib/pubkey";
 
-export const WELCOME_GUIDE_AGENT_NAME = "Fizz";
-export const WELCOME_GUIDE_PERSONA_ID = "builtin:fizz";
+export const WELCOME_GUIDE_AGENT_NAME = STARTER_AGENT_BRAND[0].name;
+export const WELCOME_GUIDE_PERSONA_ID = STARTER_AGENT_BRAND[0].personaId;
 export const WELCOME_TEAM_ID = "builtin-team:welcome";
 export const WELCOME_GUIDE_INTRO_MARKER = "buzz-welcome-intro.v1";
 const LEGACY_WELCOME_GUIDE_AGENT_NAME = "Kit";
 export const LEGACY_WELCOME_GUIDE_SYSTEM_PROMPT =
   "You are Kit, Sprout's friendly welcome guide. Help new users understand the community, channels, messages, and agents. Keep introductions concise, practical, and warm.";
 export const WELCOME_GUIDE_INTRO_MESSAGE =
-  "Hi, I'm Fizz. Welcome to Buzz.\n\nI can help you get oriented, answer questions, and make the first few steps feel less mysterious.\n\nFeel free to ask me what else you can do in Buzz, or just talk through what you want to build.";
+  "Hi, I'm Diego. Welcome to Zorro.\n\nI can help you get oriented, answer questions, and make the first few steps feel less mysterious.\n\nFeel free to ask me what else you can do in Zorro, or just talk through what you want to build.";
 
 export type WelcomeTeamRole = "lead" | "teammate";
 
@@ -41,11 +42,9 @@ export type WelcomeTeamStarterDefinition = Readonly<{
 }>;
 
 /** Stable identities used to provision the Rust-seeded Welcome Team. */
-export const WELCOME_TEAM_STARTERS = [
-  { name: "Fizz", personaId: "builtin:fizz", role: "lead" },
-  { name: "Honey", personaId: "builtin:honey", role: "teammate" },
-  { name: "Pollen", personaId: "builtin:bumble", role: "teammate" },
-] as const satisfies readonly WelcomeTeamStarterDefinition[];
+export const WELCOME_TEAM_STARTERS = STARTER_AGENT_BRAND.map(
+  ({ name, personaId, role }) => ({ name, personaId, role }),
+) satisfies readonly WelcomeTeamStarterDefinition[];
 
 export type WelcomeTeamAgents = [ManagedAgent, ManagedAgent, ManagedAgent];
 
@@ -138,7 +137,7 @@ export async function getWelcomeTeamAgentPubkeys(relayUrl?: string | null) {
     .map((agent) => agent.pubkey);
 }
 
-/** Legacy Fizz/Kit lookup retained for existing channel reuse checks. */
+/** Legacy Diego/Kit lookup retained for existing channel reuse checks. */
 export async function getWelcomeGuideAgentPubkeys(relayUrl?: string | null) {
   return (await listManagedAgents())
     .filter(
@@ -370,11 +369,11 @@ async function provisionWelcomeTeam(
     const created = await createManagedAgent(desired);
     agents.push(created.agent);
   }
-  const [lead, honey, pollen] = agents;
-  if (!lead || !honey || !pollen) {
+  const [lead, murietta, montero] = agents;
+  if (!lead || !murietta || !montero) {
     throw new Error("Welcome Team provisioning did not return every starter.");
   }
-  const welcomeAgents: WelcomeTeamAgents = [lead, honey, pollen];
+  const welcomeAgents: WelcomeTeamAgents = [lead, murietta, montero];
   const leadPubkey = lead.pubkey;
   for (const index of [1, 2] as const) {
     const teammate = welcomeAgents[index];

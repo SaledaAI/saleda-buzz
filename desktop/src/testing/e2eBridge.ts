@@ -23,6 +23,7 @@ import type { ChannelTemplate, RelayEvent } from "@/shared/api/types";
 import { getMarkdownParseCount } from "@/shared/ui/markdown/nodeCache";
 import { syncAgentTurnsFromEvents } from "@/features/agents/activeAgentTurnsStore";
 import { recordTimeoutFromRejection } from "@/features/moderation/lib/timeoutStore";
+import { PRODUCT_NAME } from "@/shared/brand";
 import {
   injectObserverEventsForE2E,
   syncAgentObserverEvents,
@@ -2239,7 +2240,7 @@ function buildMockConfigSurface(pubkey: string): {
   const buzzAgentSurface = {
     ...gooseSurface,
     runtimeId: "buzz-agent",
-    runtimeLabel: "Buzz Agent",
+    runtimeLabel: `${PRODUCT_NAME} Agent`,
     advanced: [],
     extensions: [],
     sources: {
@@ -2432,22 +2433,22 @@ function resetMockPersonas(config?: E2eConfig) {
   const activePersonaIds = new Set(config?.mock?.activePersonaIds ?? []);
   const builtInPersonas = [
     {
-      id: "builtin:fizz",
-      display_name: "Fizz",
+      id: "builtin:diego",
+      display_name: "Diego",
       avatar_url: null,
-      system_prompt: "You are Fizz.",
+      system_prompt: "You are Diego.",
     },
     {
-      id: "builtin:honey",
-      display_name: "Honey",
+      id: "builtin:murietta",
+      display_name: "Murietta",
       avatar_url: null,
-      system_prompt: "You are Honey.",
+      system_prompt: "You are Murietta.",
     },
     {
-      id: "builtin:bumble",
-      display_name: "Pollen",
+      id: "builtin:montero",
+      display_name: "Montero",
       avatar_url: null,
-      system_prompt: "You are Pollen.",
+      system_prompt: "You are Montero.",
     },
   ];
   mockPersonas = builtInPersonas.map((persona) => ({
@@ -8134,15 +8135,15 @@ async function handleDiscoverAcpRuntimes(
     },
     {
       id: "buzz-agent",
-      label: "Buzz Agent",
+      label: `${PRODUCT_NAME} Agent`,
       avatar_url: "",
       availability: "available",
       command: "buzz-agent",
       binary_path: "/usr/local/bin/buzz-agent",
       default_args: [],
       mcp_command: "buzz-dev-mcp",
-      install_hint: "Ships with the Buzz desktop app.",
-      install_instructions_url: "https://github.com/block/buzz",
+      install_hint: `Ships with the ${PRODUCT_NAME} desktop app.`,
+      install_instructions_url: "https://github.com/SaledaAI/saleda-buzz",
       can_auto_install: false,
       requires_external_cli: false,
       underlying_cli_path: null,
@@ -9146,7 +9147,7 @@ async function handleStartManagedAgent(
         mockMeshState.models.some((model) => model.id === modelId));
     if (!hasLiveTarget) {
       throw new Error(
-        "Buzz shared compute cannot start because no live member is serving this model.",
+        `${PRODUCT_NAME} shared compute cannot start because no live member is serving this model.`,
       );
     }
   }
@@ -11677,7 +11678,7 @@ export function maybeInstallE2eTauriMocks() {
               name: "Gemma-4-E4B-it-Q4_K_M",
               size: "3.5GB",
               sizeGb: 3.5,
-              description: "Buzz-curated local agent model",
+              description: `${PRODUCT_NAME}-curated local agent model`,
               fit: "comfortable",
               installed: true,
               recommended: true,
@@ -13196,7 +13197,7 @@ export function maybeInstallE2eTauriMocks() {
           }
           if (mockMeshState.models.length === 0) {
             throw new Error(
-              "no Buzz shared compute serving members are available",
+              `no ${PRODUCT_NAME} shared compute serving members are available`,
             );
           }
         }

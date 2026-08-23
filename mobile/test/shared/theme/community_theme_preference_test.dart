@@ -54,7 +54,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     final storage = CommunityThemeStorage(prefs);
     const a = CommunityThemePreference(
-      theme: 'buzz',
+      theme: 'zorro',
       accent: '#3b82f6',
       followSystem: true,
     );

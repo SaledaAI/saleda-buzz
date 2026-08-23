@@ -148,11 +148,12 @@ void main() {
     test('dark mode falls back to the default pair when pick is unpaired', () {
       // 'snazzy-light' is light and has no dark counterpart.
       final resolved = resolveSchemes('snazzy-light', ThemeMode.dark);
+      final defaultDarkName = themePairFor(defaultSchemeName)!;
 
       expect(resolved.forcedMode, ThemeMode.dark);
       expect(resolved.dark.brightness, Brightness.dark);
-      expect(resolved.darkTheme?.name, buzzDarkThemeName);
-      expect(resolved.dark, generateColorScheme(findTheme(buzzDarkThemeName)!));
+      expect(resolved.darkTheme?.name, defaultDarkName);
+      expect(resolved.dark, generateColorScheme(findTheme(defaultDarkName)!));
     });
 
     test('light mode falls back to the default pair when pick is unpaired', () {
@@ -160,8 +161,11 @@ void main() {
 
       expect(resolved.forcedMode, ThemeMode.light);
       expect(resolved.light.brightness, Brightness.light);
-      expect(resolved.lightTheme?.name, buzzThemeName);
-      expect(resolved.light, generateColorScheme(findTheme(buzzThemeName)!));
+      expect(resolved.lightTheme?.name, defaultSchemeName);
+      expect(
+        resolved.light,
+        generateColorScheme(findTheme(defaultSchemeName)!),
+      );
     });
 
     test('an unknown scheme name falls back to the default theme', () {
@@ -178,11 +182,11 @@ void main() {
     test('system mode replaces an unpaired selection with a paired theme', () {
       expect(
         schemeForAppearanceMode('snazzy-light', ThemeMode.system),
-        themeGroups().paired.first.name,
+        defaultSchemeName,
       );
       expect(
         schemeForAppearanceMode('nord', ThemeMode.system),
-        themeGroups().paired.first.name,
+        defaultSchemeName,
       );
     });
 

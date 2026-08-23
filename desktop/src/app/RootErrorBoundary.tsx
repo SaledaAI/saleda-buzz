@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
 
+import { PRODUCT_NAME } from "@/shared/brand";
+
 type RootErrorBoundaryProps = {
   children: ReactNode;
 };
@@ -38,10 +40,12 @@ export class RootErrorBoundary extends Component<
     if (error) {
       return (
         <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-background px-6 text-foreground">
-          <p className="text-base font-semibold">Buzz failed to start</p>
+          <p className="text-base font-semibold">
+            {PRODUCT_NAME} failed to start
+          </p>
           <p className="max-w-md text-center text-sm text-muted-foreground">
-            Reload Buzz to try again. If this keeps happening, check that Buzz
-            can access website data, then contact support.
+            Reload {PRODUCT_NAME} to try again. If this keeps happening, check
+            that {PRODUCT_NAME} can access website data, then contact support.
           </p>
           <button
             type="button"

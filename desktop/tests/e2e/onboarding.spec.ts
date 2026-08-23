@@ -304,8 +304,8 @@ async function expectWelcomePersonaMention(page: Page) {
   const banner = page.getByTestId("welcome-composer-guide-banner");
   const personaMention = page.getByTestId("welcome-composer-persona-mention");
   await expect(personaMention).toBeVisible();
-  await expect(personaMention).toHaveAttribute("data-persona-options", "Fizz");
-  await expect(personaMention).toHaveAttribute("data-active-persona", "Fizz");
+  await expect(personaMention).toHaveAttribute("data-persona-options", "Diego");
+  await expect(personaMention).toHaveAttribute("data-active-persona", "Diego");
   await expect(personaMention).toHaveAttribute(
     "data-animation-target",
     "per-character",
@@ -452,7 +452,7 @@ async function expectWelcomeComposerBannerCompletesAfterPersonaMention(
     throw new Error("Could not measure the Welcome composer");
   }
 
-  await page.getByTestId("message-input").fill("Thanks @Fizz");
+  await page.getByTestId("message-input").fill("Thanks @Diego");
   await page.getByTestId("send-message").click();
 
   await expect(banner).toHaveAttribute("data-state", "complete");
@@ -637,31 +637,32 @@ async function expectWelcomeGuideIntro(
           Array<{ pubkey: string; name: string; persona_id: string | null }>
         >(page, "list_managed_agents"),
       ]);
-      const fizz = agents.find(
-        (agent) => agent.name === "Fizz" && agent.persona_id === "builtin:fizz",
+      const diego = agents.find(
+        (agent) =>
+          agent.name === "Diego" && agent.persona_id === "builtin:diego",
       );
-      const fizzMember = fizz
-        ? members.members.find((member) => member.pubkey === fizz.pubkey)
+      const diegoMember = diego
+        ? members.members.find((member) => member.pubkey === diego.pubkey)
         : null;
-      const profileAvatarUrl = fizz
+      const profileAvatarUrl = diego
         ? (
             await invokeMockCommand<{
               profiles: Record<string, { avatar_url: string | null }>;
             }>(page, "get_users_batch", {
-              pubkeys: [fizz.pubkey],
+              pubkeys: [diego.pubkey],
             })
-          ).profiles[fizz.pubkey]?.avatar_url
+          ).profiles[diego.pubkey]?.avatar_url
         : null;
 
       return {
-        fizzIsBot: fizzMember?.role === "bot" && fizzMember.is_agent,
-        fizzPersonaId: fizz?.persona_id ?? null,
+        diegoIsBot: diegoMember?.role === "bot" && diegoMember.is_agent,
+        diegoPersonaId: diego?.persona_id ?? null,
         profileAvatarUrl,
       };
     })
     .toEqual({
-      fizzIsBot: true,
-      fizzPersonaId: "builtin:fizz",
+      diegoIsBot: true,
+      diegoPersonaId: "builtin:diego",
       profileAvatarUrl: null,
     });
 
@@ -714,7 +715,7 @@ test("fresh existing-identity path leads with private-key recovery", async ({
     page.getByRole("heading", { name: "Enter your private key" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Paste your private key to sign in to Buzz."),
+    page.getByText("Paste your private key to sign in to Zorro."),
   ).toBeVisible();
   await expect(page.getByTestId("nostr-import-card")).toBeVisible();
   await expect(page.getByTestId("nostr-import-file-button")).toHaveText(
@@ -787,7 +788,7 @@ test("fresh existing-identity path leads with private-key recovery", async ({
   const phoneDialog = page.getByTestId("phone-recovery-dialog");
   await expect(phoneDialog).toBeVisible();
   await expect(
-    phoneDialog.getByRole("heading", { name: "Use your Buzz identity" }),
+    phoneDialog.getByRole("heading", { name: "Use your Zorro identity" }),
   ).toBeVisible();
   await expect(phoneDialog.getByTestId("identity-recovery-qr")).toBeVisible();
   await expect(page.getByTestId("nostr-import-card")).toBeVisible();
@@ -1262,7 +1263,7 @@ test("first-community owner can create and connect a hosted community", async ({
   await page.getByTestId("community-choice-create").click();
   await page.getByRole("button", { name: "Sign in to continue" }).click();
   await expect(
-    page.getByRole("heading", { name: "Finish connecting Buzz" }),
+    page.getByRole("heading", { name: "Finish connecting Zorro" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Connect and continue" }).click();
   const createSurface = page.getByTestId("hosted-community-create-surface");
@@ -1338,7 +1339,7 @@ test("hosted community address line stays within the card for a long name", asyn
   await page.getByTestId("community-choice-create").click();
   await page.getByRole("button", { name: "Sign in to continue" }).click();
   await expect(
-    page.getByRole("heading", { name: "Finish connecting Buzz" }),
+    page.getByRole("heading", { name: "Finish connecting Zorro" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Connect and continue" }).click();
 
@@ -1480,7 +1481,7 @@ test("first-community owner can replace a mismatched account identity", async ({
   await page.getByTestId("community-choice-create").click();
   await expect(
     page.getByRole("heading", {
-      name: "This account uses a different Buzz identity",
+      name: "This account uses a different Zorro identity",
     }),
   ).toBeVisible();
   await page
@@ -1533,11 +1534,11 @@ test("first-community explains when the local identity belongs to another accoun
     .click();
   await expect(
     page.getByText(
-      "This device's Buzz identity belongs to a different Builderlab account and can't be moved from here. Sign out, then sign in with the account that already owns this identity.",
+      "This device's Zorro identity belongs to a different Builderlab account and can't be moved from here. Sign out, then sign in with the account that already owns this identity.",
     ),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Finish connecting Buzz" }),
+    page.getByRole("heading", { name: "Finish connecting Zorro" }),
   ).toBeVisible();
 });
 
@@ -2029,12 +2030,12 @@ test("connected first-community profile keeps Back bottom-left and balances the 
   await expect(page.getByText("Your username", { exact: true })).toBeVisible();
   await expect(page.getByTestId("community-onboarding-flow")).toHaveAttribute(
     "data-system-color-scheme",
-    /^(light|dark)$/,
+    "light",
   );
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.getByTestId("community-onboarding-flow")).toHaveAttribute(
     "data-system-color-scheme",
-    "dark",
+    "light",
   );
   await avatarButton.click();
   const avatarDialog = page.getByRole("dialog", { name: "Edit your avatar" });
@@ -3196,7 +3197,7 @@ test("failed public starter channel setup does not show a retry toast", async ({
   expect(await commandCount(page, "ensure_starter_channels")).toBe(2);
 });
 
-test("first-run onboarding posts the live Fizz kickoff", async ({ page }) => {
+test("first-run onboarding posts the live Diego kickoff", async ({ page }) => {
   await seedActiveIdentity(page, BLANK_TYLER_IDENTITY);
   await installMockBridge(
     page,
@@ -3215,13 +3216,13 @@ test("first-run onboarding posts the live Fizz kickoff", async ({ page }) => {
   await completeProfileOnboarding(page);
 
   await expectPrivateWelcomeLanding(page);
-  // Greeted by the name typed above — the @mention pill also files the opener
-  // into the new user's Inbox mentions feed.
+  // The owner pubkey tag files the workspace greeting into the new user's
+  // Inbox mentions feed without putting their name in the shared opener.
   await expect(page.getByTestId("message-timeline")).toContainText(
-    "Hi Morty QA, I'm Fizz. Welcome to Buzz.",
+    "Welcome to Zorro, your interface between your employees and your specialized AI agents. I’m Diego, the seasoned project manager.",
   );
   await expect(page.getByTestId("message-timeline")).toContainText(
-    "Honey and Pollen, introduce yourselves",
+    "Murietta and Montero, introduce yourselves",
   );
 });
 
@@ -3242,7 +3243,7 @@ test("first-run onboarding lands before Welcome team bootstrap completes", async
   await expectPrivateWelcomeLanding(page);
   await expect(page.getByTestId("app-loading-gate")).toHaveCount(0);
   await expect(page.getByTestId("message-timeline")).toContainText(
-    "Hi Morty QA, I'm Fizz. Welcome to Buzz.",
+    "Welcome to Zorro, your interface between your employees and your specialized AI agents. I’m Diego, the seasoned project manager.",
   );
   await page.waitForTimeout(1_500);
   expect(await commandCount(page, "create_managed_agent")).toBe(3);
@@ -4106,7 +4107,7 @@ test("denied on relay A then paste relay B invite URL switches community to B", 
   await expect(page.getByText("I am 18 years of age or older.")).toBeVisible();
   await page.getByLabel("I am 18 years of age or older.").check();
   await page
-    .getByLabel("I agree to the Buzz Terms of Service and Privacy Policy.")
+    .getByLabel("I agree to the Zorro Terms of Service and Privacy Policy.")
     .check();
   await page.getByTestId("invite-redeem-submit").click();
 

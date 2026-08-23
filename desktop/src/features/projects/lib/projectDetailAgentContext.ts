@@ -3,8 +3,9 @@ import {
   type ProjectSelectionKind,
   projectSelectionNoun,
 } from "./projectSelection.ts";
+import { PRODUCT_NAME } from "@/shared/brand";
 
-const PROJECT_PAGE_CONTEXT_MARKER = "Current Buzz project page:";
+const PROJECT_PAGE_CONTEXT_MARKER = `Current ${PRODUCT_NAME} project page:`;
 /** Marker for the repository set appended by the full Projects agent page. */
 export const PROJECT_WORKSPACE_CONTEXT_MARKER = "Workspace repositories:";
 const PROJECT_AGENT_CONTEXT_MARKERS = [

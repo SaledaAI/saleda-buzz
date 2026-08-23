@@ -13,6 +13,7 @@ import { migrateLegacyCommunityStorageBeforeRender } from "@/features/communitie
 import { CommunitiesProvider } from "@/features/communities/useCommunities";
 import { huddleWindowChannelId } from "@/features/huddle/lib/huddleWindow";
 import { CommunityOnboardingProvider } from "@/features/onboarding/communityOnboarding";
+import { PRODUCT_THEME } from "@/shared/brand";
 import { ThemeProvider } from "@/shared/theme/ThemeProvider";
 import { EmojiBurstProvider } from "@/shared/ui/EmojiBurstProvider";
 import { PoofBurstProvider } from "@/shared/ui/PoofBurstProvider";
@@ -88,7 +89,7 @@ function renderApp() {
           <CommunityOnboardingProvider
             enabled={huddleWindowChannelId() === null}
           >
-            <ThemeProvider defaultTheme="buzz">
+            <ThemeProvider defaultTheme={PRODUCT_THEME.light}>
               <TooltipProvider>
                 <EmojiBurstProvider>
                   <PoofBurstProvider>

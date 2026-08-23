@@ -237,7 +237,7 @@ pub(crate) async fn connect_audio_relay(
         })
         .await
         {
-            eprintln!("buzz-desktop: audio relay pipeline exited: {e}");
+            eprintln!("zorro-desktop: audio relay pipeline exited: {e}");
         }
 
         // Only emit the disconnect event for UNEXPECTED exits.
@@ -541,7 +541,7 @@ async fn audio_relay_pipeline(args: AudioRelayPipelineArgs) -> Result<(), String
                 let n = match encode_result {
                     Ok(n) => n,
                     Err(e) => {
-                        eprintln!("buzz-desktop: opus encode error: {e}");
+                        eprintln!("zorro-desktop: opus encode error: {e}");
                         continue;
                     }
                 };
@@ -616,7 +616,7 @@ pub(crate) async fn fetch_channel_members_with_roles(
     let events = query_relay(state, std::slice::from_ref(&filter))
         .await
         .map_err(|e| {
-            eprintln!("buzz-desktop: fetch channel members failed: {e}");
+            eprintln!("zorro-desktop: fetch channel members failed: {e}");
             e
         })?;
 

@@ -209,7 +209,7 @@ export function ReadmePanel({
           </h3>
           <p className="mt-1 max-w-lg text-sm text-muted-foreground">
             Clone this repository locally to explore its files, commits, and
-            contributors in Buzz.
+            contributors in Zorro.
           </p>
           {externalOpenUrl ? (
             <a

@@ -34,7 +34,8 @@ import { LocalArchiveSettingsCard } from "@/features/local-archive/ui/LocalArchi
 import { cn } from "@/shared/lib/cn";
 import { useCommunities } from "@/features/communities/useCommunities";
 import { Badge } from "@/shared/ui/badge";
-import { isBuzzTheme, useTheme } from "@/shared/theme/ThemeProvider";
+import { PRODUCT_NAME, PRODUCT_THEME } from "@/shared/brand";
+import { isZorroTheme, useTheme } from "@/shared/theme/ThemeProvider";
 import {
   LIGHT_THEMES,
   SYNTAX_THEMES,
@@ -237,6 +238,8 @@ export const settingsSections: SettingsSectionDescriptor[] = [
 ];
 
 function formatThemeLabel(name: string): string {
+  if (name === PRODUCT_THEME.light) return `${PRODUCT_NAME} Light`;
+  if (name === PRODUCT_THEME.dark) return `${PRODUCT_NAME} Dark`;
   return name
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -250,6 +253,7 @@ function formatThemeLabel(name: string): string {
  * "material-theme-lighter", and "gruvbox-light-soft".
  */
 function pairedThemeLabel(lightName: string): string {
+  if (lightName === PRODUCT_THEME.light) return PRODUCT_NAME;
   const modeTokens = new Set([
     "light",
     "latte",
@@ -440,8 +444,8 @@ function ThemeSettingsCard() {
   // Buzz themes pin a neutral accent (GitHub black in light, white in dark),
   // so the accent picker is hidden while a Buzz theme is active. `themeName` is
   // the effective theme, so this also covers System mode resolving to Buzz.
-  const buzzThemeSelected = isBuzzTheme(themeName);
-  const accentPickerHidden = buzzThemeSelected;
+  const zorroThemeSelected = isZorroTheme(themeName);
+  const accentPickerHidden = zorroThemeSelected;
   const shouldReduceMotion = useReducedMotion();
 
   const previewVarsByTheme = useThemePreviewVars();
@@ -576,7 +580,7 @@ function ThemeSettingsCard() {
           }}
         />
         {/* Bottom fade — hidden while the accent picker is visible so its
-            near-white gradient (Buzz light) can't mask the swatches below it
+            near-white gradient (Zorro light) can't mask the swatches below it
             (the "white bar"). Kept only when the picker is hidden. */}
         {accentPickerHidden ? (
           <div
@@ -638,7 +642,7 @@ function ThemeSettingsCard() {
     >
       <SettingsSectionHeader
         title="Appearance"
-        description="Choose how Buzz looks and feels."
+        description="Choose how Zorro looks and feels."
       />
 
       <SettingsOptionGroupList>
@@ -698,7 +702,7 @@ function ThemeSettingsCard() {
                 className="text-sm font-normal text-muted-foreground/70"
                 data-settings-subcopy
               >
-                Choose the colors used throughout Buzz.
+                Choose the colors used throughout Zorro.
               </p>
             </div>
             <button
@@ -783,7 +787,7 @@ function ThemeSettingsCard() {
           )}
 
           <GlassBackgroundSetting />
-          {buzzThemeSelected ? <ProminentActiveTabSetting /> : null}
+          {zorroThemeSelected ? <ProminentActiveTabSetting /> : null}
         </SettingsOptionGroup>
 
         <SettingsOptionGroup

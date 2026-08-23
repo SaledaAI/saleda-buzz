@@ -13,6 +13,8 @@ import {
 import * as React from "react";
 import { toast } from "sonner";
 
+import { PRODUCT_NAME } from "@/shared/brand";
+
 import type { LeaveCommunityResult } from "@/features/communities/leaveCommunity";
 import type { Community } from "@/features/communities/types";
 import {
@@ -36,6 +38,7 @@ import {
   useRelayConnection,
 } from "@/shared/api/useRelayConnection";
 import { writeTextToClipboard } from "@/shared/lib/clipboard";
+import { ZorroHat } from "@/shared/ui/zorro-logo/ZorroHat";
 import { useActiveCommunityIcon } from "@/features/communities/useCommunityIcons";
 import { EditCommunityDialog } from "./EditCommunityDialog";
 
@@ -93,7 +96,7 @@ export function CommunityEmojiIcon({
   }
   return (
     <span aria-hidden="true" className={className}>
-      <span className="-translate-y-px leading-normal">🐝</span>
+      <ZorroHat className="h-4 w-4" />
     </span>
   );
 }
@@ -174,8 +177,7 @@ export function CommunitySwitcher({
       setDropdownOpen(false);
       if (result?.status === "already-absent") {
         toast("Community removed", {
-          description:
-            "You were no longer a member, so Buzz removed the community from this device.",
+          description: `You were no longer a member, so ${PRODUCT_NAME} removed the community from this device.`,
         });
       }
     } catch (error) {

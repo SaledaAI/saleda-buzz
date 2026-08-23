@@ -267,7 +267,7 @@ test("@ trigger prioritizes channel members before runnable personas and other m
   page,
 }) => {
   await installMockBridge(page, {
-    activePersonaIds: ["builtin:fizz"],
+    activePersonaIds: ["builtin:diego"],
     managedAgents: [
       {
         pubkey: TEST_IDENTITIES.charlie.pubkey,
@@ -287,7 +287,7 @@ test("@ trigger prioritizes channel members before runnable personas and other m
   await expect(dropdown).toBeVisible();
   await expect(dropdown.getByText("alice")).toBeVisible();
   await expect(dropdown.getByText("bob")).toBeVisible();
-  await expect(dropdown.getByText("Fizz")).toBeVisible();
+  await expect(dropdown.getByText("Diego")).toBeVisible();
   await expect(dropdown.getByText("charlie")).toBeVisible();
   await expect(dropdown.getByText("outsider")).toHaveCount(0);
   const charlieRow = dropdown.locator("button", { hasText: "charlie" });
@@ -301,8 +301,7 @@ test("@ trigger prioritizes channel members before runnable personas and other m
 
   const suggestions = dropdown.locator("button");
   const suggestionText = await suggestions.allInnerTexts();
-  const aliceIndex = suggestionText.findIndex((text) => text.includes("alice"));
-  const fizzIndex = suggestionText.findIndex((text) => text.includes("Fizz"));
+  const diegoIndex = suggestionText.findIndex((text) => text.includes("Diego"));
   const bobIndex = suggestionText.findIndex((text) => text.includes("bob"));
   const charlieIndex = suggestionText.findIndex((text) =>
     text.includes("charlie"),
@@ -310,14 +309,12 @@ test("@ trigger prioritizes channel members before runnable personas and other m
   const outsiderIndex = suggestionText.findIndex((text) =>
     text.includes("outsider"),
   );
-  expect(aliceIndex).toBeGreaterThanOrEqual(0);
-  expect(fizzIndex).toBeGreaterThanOrEqual(0);
+  expect(diegoIndex).toBeGreaterThanOrEqual(0);
   expect(bobIndex).toBeGreaterThanOrEqual(0);
   expect(charlieIndex).toBeGreaterThanOrEqual(0);
   expect(outsiderIndex).toEqual(-1);
-  expect(aliceIndex).toBeLessThan(fizzIndex);
-  expect(bobIndex).toBeLessThan(fizzIndex);
-  expect(fizzIndex).toBeLessThan(charlieIndex);
+  expect(bobIndex).toBeLessThan(diegoIndex);
+  expect(diegoIndex).toBeLessThan(charlieIndex);
 });
 
 test("duplicate owned agents preserve provenance and exact pubkey selection", async ({
@@ -381,7 +378,7 @@ test("duplicate owned agents preserve provenance and exact pubkey selection", as
   await expect(relayRow).toContainText("agent");
   await expect(
     relayRow.getByTestId("mention-agent-provenance"),
-  ).toHaveAttribute("aria-label", "From another Buzz setup");
+  ).toHaveAttribute("aria-label", "From another Zorro setup");
   await expect(
     relayRow.getByText("Other setup", { exact: true }),
   ).toBeVisible();
@@ -462,7 +459,7 @@ test("duplicate owned agents preserve provenance and exact pubkey selection", as
   ).toHaveCount(0);
   await expect(remoteSidebarMarker).toHaveAttribute(
     "aria-label",
-    "From another Buzz setup",
+    "From another Zorro setup",
   );
   await expect(remoteSidebarMarker).toHaveText("Other setup");
   const remoteSidebarRow = page.getByTestId(`sidebar-member-${relayPubkey}`);
@@ -603,7 +600,7 @@ test("blocks non-participant persona mentions in DM threads", async ({
   page,
 }) => {
   await installMockBridge(page, {
-    activePersonaIds: ["builtin:fizz"],
+    activePersonaIds: ["builtin:diego"],
   });
   await page.goto("/");
   await page.getByTestId("channel-bob-tyler").click();
@@ -624,11 +621,11 @@ test("blocks non-participant persona mentions in DM threads", async ({
 
   const threadPanel = page.getByTestId("message-thread-panel");
   const input = threadPanel.getByTestId("message-input");
-  await input.fill("Ask @fi");
+  await input.fill("Ask @di");
   await expect(
     threadPanel
       .getByTestId("mention-autocomplete")
-      .locator("button", { hasText: "Fizz" }),
+      .locator("button", { hasText: "Diego" }),
   ).toBeVisible();
   await input.press("Enter");
   await page.keyboard.type(" in this thread");
@@ -648,7 +645,7 @@ test("blocks non-participant persona mentions in DM threads", async ({
   expect(commandCount(commands, "add_channel_members")).toBe(
     commandCount(baselineCommands, "add_channel_members"),
   );
-  await expect(input).toContainText("Fizz");
+  await expect(input).toContainText("Diego");
   await expect(page.getByTestId("chat-title")).toHaveText("bob-tyler");
 });
 
@@ -997,29 +994,29 @@ test("selecting a persona mention creates a channel agent before sending", async
   page,
 }) => {
   await installMockBridge(page, {
-    activePersonaIds: ["builtin:fizz"],
+    activePersonaIds: ["builtin:diego"],
   });
   await page.goto("/");
   await page.getByTestId("channel-general").click();
   await expect(page.getByTestId("chat-title")).toHaveText("general");
 
   const input = page.getByTestId("message-input");
-  await input.fill("Ask @fi");
+  await input.fill("Ask @di");
 
   const dropdown = autocomplete(page);
-  const fizzRow = dropdown.locator("button", { hasText: "Fizz" });
-  await expect(fizzRow).toBeVisible();
-  await expect(fizzRow.getByTestId("mention-agent-icon")).toBeVisible();
-  await expect(fizzRow.getByText("agent")).toBeVisible();
-  await expect(fizzRow.getByText("not in channel")).toBeVisible();
+  const diegoRow = dropdown.locator("button", { hasText: "Diego" });
+  await expect(diegoRow).toBeVisible();
+  await expect(diegoRow.getByTestId("mention-agent-icon")).toBeVisible();
+  await expect(diegoRow.getByText("agent")).toBeVisible();
+  await expect(diegoRow.getByText("not in channel")).toBeVisible();
   await input.press("Enter");
   await page.keyboard.type(" for a hand");
 
   const composerChip = input.locator(".agent-mention-highlight", {
-    hasText: "Fizz",
+    hasText: "Diego",
   });
   await expect(composerChip).toBeVisible();
-  await expect(composerChip).toHaveText("Fizz");
+  await expect(composerChip).toHaveText("Diego");
 
   const baselineCommands = await readCommandLog(page);
   const baselineCreateCount = commandCount(
@@ -1069,21 +1066,21 @@ test("selecting a persona mention creates a channel agent before sending", async
   const mentionChip = page
     .getByTestId("message-row")
     .last()
-    .locator("[data-mention].agent-mention-highlight", { hasText: "Fizz" });
+    .locator("[data-mention].agent-mention-highlight", { hasText: "Diego" });
   await expect(mentionChip).toBeVisible();
-  await expect(mentionChip).toHaveText("Fizz");
+  await expect(mentionChip).toHaveText("Diego");
 });
 
 test("selecting a persona mention reuses an existing persona agent", async ({
   page,
 }) => {
   await installMockBridge(page, {
-    activePersonaIds: ["builtin:fizz"],
+    activePersonaIds: ["builtin:diego"],
     managedAgents: [
       {
         pubkey: REUSABLE_PERSONA_AGENT_PUBKEY,
-        name: "Fizz",
-        personaId: "builtin:fizz",
+        name: "Diego",
+        personaId: "builtin:diego",
         status: "stopped",
       },
     ],
@@ -1093,11 +1090,11 @@ test("selecting a persona mention reuses an existing persona agent", async ({
   await expect(page.getByTestId("chat-title")).toHaveText("general");
 
   const input = page.getByTestId("message-input");
-  await input.fill("Ask @fi");
+  await input.fill("Ask @di");
 
   const dropdown = autocomplete(page);
-  const fizzRow = dropdown.locator("button", { hasText: "Fizz" });
-  await expect(fizzRow).toBeVisible();
+  const diegoRow = dropdown.locator("button", { hasText: "Diego" });
+  await expect(diegoRow).toBeVisible();
   await input.press("Enter");
   await page.keyboard.type(" for a hand");
 
@@ -1135,9 +1132,9 @@ test("selecting a persona mention reuses an existing persona agent", async ({
   const mentionChip = page
     .getByTestId("message-row")
     .last()
-    .locator("[data-mention].agent-mention-highlight", { hasText: "Fizz" });
+    .locator("[data-mention].agent-mention-highlight", { hasText: "Diego" });
   await expect(mentionChip).toBeVisible();
-  await expect(mentionChip).toHaveText("Fizz");
+  await expect(mentionChip).toHaveText("Diego");
 });
 
 test("managed relay-profile agents with member roles use the agent address tray", async ({
@@ -1940,7 +1937,7 @@ test("mentioning an in-channel stopped managed agent starts it before sending", 
     managedAgents: [
       {
         pubkey: IN_CHANNEL_MANAGED_AGENT_PUBKEY,
-        name: "fizz",
+        name: "diego",
         status: "stopped",
         channelNames: ["general"],
       },
@@ -1951,10 +1948,10 @@ test("mentioning an in-channel stopped managed agent starts it before sending", 
   await expect(page.getByTestId("chat-title")).toHaveText("general");
 
   const input = page.getByTestId("message-input");
-  await input.fill("Hey @fizz");
+  await input.fill("Hey @diego");
 
   const dropdown = autocomplete(page);
-  await expect(dropdown.getByText("fizz")).toBeVisible();
+  await expect(dropdown.getByText("diego")).toBeVisible();
   await expect(dropdown.getByText("agent")).toBeVisible();
   await input.press("Enter");
   await page.keyboard.type(" can you help?");
@@ -1974,7 +1971,7 @@ test("mentioning an in-channel stopped managed agent starts it before sending", 
   const mentionChip = page
     .getByTestId("message-row")
     .last()
-    .locator("[data-mention].agent-mention-highlight", { hasText: "fizz" });
+    .locator("[data-mention].agent-mention-highlight", { hasText: "diego" });
   await expect(mentionChip).toBeVisible();
 });
 
@@ -2035,7 +2032,7 @@ test("mentioning a non-member managed agent adds and starts it before sending", 
     managedAgents: [
       {
         pubkey: OUT_OF_CHANNEL_MANAGED_AGENT_PUBKEY,
-        name: "fizz",
+        name: "diego",
         status: "stopped",
       },
     ],
@@ -2045,12 +2042,12 @@ test("mentioning a non-member managed agent adds and starts it before sending", 
   await expect(page.getByTestId("chat-title")).toHaveText("general");
 
   const input = page.getByTestId("message-input");
-  await input.fill("Loop in @fizz");
+  await input.fill("Loop in @diego");
 
   const dropdown = autocomplete(page);
-  const fizzRow = dropdown.locator("button", { hasText: "fizz" });
-  await expect(fizzRow).toBeVisible();
-  await expect(fizzRow.getByText("not in channel")).toBeVisible();
+  const diegoRow = dropdown.locator("button", { hasText: "diego" });
+  await expect(diegoRow).toBeVisible();
+  await expect(diegoRow.getByText("not in channel")).toBeVisible();
   await input.press("Enter");
 
   const baselineCommands = await readCommandLog(page);
@@ -2080,7 +2077,7 @@ test("mentioning a non-member managed agent adds and starts it before sending", 
   const mentionChip = page
     .getByTestId("message-row")
     .last()
-    .locator("[data-mention].agent-mention-highlight", { hasText: "fizz" });
+    .locator("[data-mention].agent-mention-highlight", { hasText: "diego" });
   await expect(mentionChip).toBeVisible();
 });
 
@@ -2862,7 +2859,7 @@ test("agent profile popover shows its owner", async ({ page }) => {
     searchProfiles: [
       {
         pubkey: OWNED_AGENT_PROFILE_PUBKEY,
-        displayName: "Pollen",
+        displayName: "Montero",
         ownerPubkey: TEST_IDENTITIES.bob.pubkey,
         isAgent: true,
       },
@@ -2873,16 +2870,16 @@ test("agent profile popover shows its owner", async ({ page }) => {
   await expect(page.getByTestId("chat-title")).toHaveText("general");
   await waitForMockLiveSubscription(page, "general");
 
-  await emitMockMessage(page, "general", "Pollen checking in.", {
+  await emitMockMessage(page, "general", "Montero checking in.", {
     pubkey: OWNED_AGENT_PROFILE_PUBKEY,
   });
   await waitForTimelineSettled(page);
 
-  const pollenMessage = page
+  const monteroMessage = page
     .getByTestId("message-row")
-    .filter({ hasText: "Pollen checking in." })
+    .filter({ hasText: "Montero checking in." })
     .first();
-  await pollenMessage.locator("button").first().hover();
+  await monteroMessage.locator("button").first().hover();
 
   const profilePopover = page.locator(
     '[data-testid="user-profile-popover"][data-state="open"]',
@@ -2902,7 +2899,7 @@ test("agent profile popover labels an agent owned by the viewer as you", async (
     searchProfiles: [
       {
         pubkey: OWNED_AGENT_PROFILE_PUBKEY,
-        displayName: "Pollen",
+        displayName: "Montero",
         ownerPubkey: MOCK_VIEWER_PUBKEY,
         isAgent: true,
       },
@@ -2913,16 +2910,16 @@ test("agent profile popover labels an agent owned by the viewer as you", async (
   await expect(page.getByTestId("chat-title")).toHaveText("general");
   await waitForMockLiveSubscription(page, "general");
 
-  await emitMockMessage(page, "general", "Pollen checking in.", {
+  await emitMockMessage(page, "general", "Montero checking in.", {
     pubkey: OWNED_AGENT_PROFILE_PUBKEY,
   });
   await waitForTimelineSettled(page);
 
-  const pollenMessage = page
+  const monteroMessage = page
     .getByTestId("message-row")
-    .filter({ hasText: "Pollen checking in." })
+    .filter({ hasText: "Montero checking in." })
     .first();
-  await pollenMessage.locator("button").first().hover();
+  await monteroMessage.locator("button").first().hover();
 
   const profilePopover = page.locator(
     '[data-testid="user-profile-popover"][data-state="open"]',
@@ -2942,7 +2939,7 @@ test("agent profile popover falls back to the owner's pubkey", async ({
     searchProfiles: [
       {
         pubkey: OWNED_AGENT_PROFILE_PUBKEY,
-        displayName: "Pollen",
+        displayName: "Montero",
         ownerPubkey: CASEY_PROFILE_PUBKEY,
         isAgent: true,
       },
@@ -2953,16 +2950,16 @@ test("agent profile popover falls back to the owner's pubkey", async ({
   await expect(page.getByTestId("chat-title")).toHaveText("general");
   await waitForMockLiveSubscription(page, "general");
 
-  await emitMockMessage(page, "general", "Pollen checking in.", {
+  await emitMockMessage(page, "general", "Montero checking in.", {
     pubkey: OWNED_AGENT_PROFILE_PUBKEY,
   });
   await waitForTimelineSettled(page);
 
-  const pollenMessage = page
+  const monteroMessage = page
     .getByTestId("message-row")
-    .filter({ hasText: "Pollen checking in." })
+    .filter({ hasText: "Montero checking in." })
     .first();
-  await pollenMessage.locator("button").first().hover();
+  await monteroMessage.locator("button").first().hover();
 
   const profilePopover = page.locator(
     '[data-testid="user-profile-popover"][data-state="open"]',

@@ -12,6 +12,7 @@ import {
 import type { IdentityArchiveActions } from "@/features/identity-archive/hooks";
 import { ArchiveConfirmDialog } from "@/features/profile/ui/ArchiveConfirmDialog";
 import type { ManagedAgent } from "@/shared/api/types";
+import { PRODUCT_NAME } from "@/shared/brand";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -269,7 +270,7 @@ function AgentDeleteConfirmDialog({
           </li>
           <li>
             {isProviderAgent
-              ? "Requests remote deletion; if it is online, Buzz first sends a shutdown command when possible. If the deployment cannot be reached through a channel, the remote process may keep running without local management."
+              ? `Requests remote deletion; if it is online, ${PRODUCT_NAME} first sends a shutdown command when possible. If the deployment cannot be reached through a channel, the remote process may keep running without local management.`
               : "Stops any local agent process before deleting the record"}
           </li>
         </ul>

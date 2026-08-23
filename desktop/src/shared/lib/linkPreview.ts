@@ -319,7 +319,7 @@ function parseBuzzEntityPreview(href: string): SupportedLinkPreview | null {
     return {
       kind: "buzz-pull-request",
       href: buildPullRequestLink(link),
-      provider: "Buzz",
+      provider: "Zorro",
       title,
       typeLabel: "Review",
     };
@@ -328,7 +328,7 @@ function parseBuzzEntityPreview(href: string): SupportedLinkPreview | null {
     return {
       kind: "buzz-issue",
       href: buildIssueLink(link),
-      provider: "Buzz",
+      provider: "Zorro",
       title,
       typeLabel: "Task",
     };
@@ -337,7 +337,7 @@ function parseBuzzEntityPreview(href: string): SupportedLinkPreview | null {
     return {
       kind: "buzz-project",
       href: buildProjectLink(link),
-      provider: "Buzz",
+      provider: "Zorro",
       title,
       typeLabel: "project",
     };
@@ -345,7 +345,7 @@ function parseBuzzEntityPreview(href: string): SupportedLinkPreview | null {
   return {
     kind: "buzz-repository",
     href: buildRepoLink(link),
-    provider: "Buzz",
+    provider: "Zorro",
     title,
     typeLabel: "repo",
   };
@@ -387,7 +387,7 @@ function parseBuzzGitLink(
   return {
     kind: "buzz-repository",
     href: buildRepoLink({ owner, dtag: repo }),
-    provider: "Buzz",
+    provider: "Zorro",
     title: repo,
     typeLabel: "repo",
   };

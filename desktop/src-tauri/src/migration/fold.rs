@@ -27,10 +27,10 @@ pub fn fold_personas_into_agent_store(app: &tauri::AppHandle) {
         Ok(None) => {}
         Ok(Some(folded)) => {
             eprintln!(
-                "buzz-desktop: persona-store-fold: {folded} definitions folded into the unified store"
+                "zorro-desktop: persona-store-fold: {folded} definitions folded into the unified store"
             );
         }
-        Err(e) => eprintln!("buzz-desktop: persona-store-fold: {e}"),
+        Err(e) => eprintln!("zorro-desktop: persona-store-fold: {e}"),
     }
 }
 
@@ -190,7 +190,7 @@ mod tests {
             dir.path(),
             &serde_json::json!([
                 custom_persona_json("custom:one", "goose"),
-                { "id": "builtin:fizz", "display_name": "Fizz", "system_prompt": "P",
+                { "id": "builtin:diego", "display_name": "Diego", "system_prompt": "P",
                   "is_builtin": true,
                   "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" }
             ]),

@@ -1,11 +1,21 @@
 use url::Url;
 
 use super::{
-    parse_add_community_deep_link, parse_channel_deep_link, parse_entity_deep_link,
-    parse_join_deep_link, parse_message_deep_link, parse_nostr_bind_deep_link,
-    PendingCommunityDeepLink, PendingCommunityDeepLinks, PendingEntityDeepLinks,
-    PendingNavigationDeepLink, PendingNavigationDeepLinks, ENTITY_LINK_TABS,
+    is_supported_deep_link_scheme, is_supported_deep_link_url, parse_add_community_deep_link,
+    parse_channel_deep_link, parse_entity_deep_link, parse_join_deep_link, parse_message_deep_link,
+    parse_nostr_bind_deep_link, PendingCommunityDeepLink, PendingCommunityDeepLinks,
+    PendingEntityDeepLinks, PendingNavigationDeepLink, PendingNavigationDeepLinks,
+    ENTITY_LINK_TABS,
 };
+
+#[test]
+fn supports_zorro_and_legacy_buzz_schemes() {
+    assert!(is_supported_deep_link_scheme("zorro"));
+    assert!(is_supported_deep_link_scheme("buzz"));
+    assert!(is_supported_deep_link_url("zorro://message?channel=a&id=b"));
+    assert!(is_supported_deep_link_url("buzz://message?channel=a&id=b"));
+    assert!(!is_supported_deep_link_url("https://example.com"));
+}
 
 fn entity_link_golden() -> serde_json::Value {
     serde_json::from_str(include_str!("../../../test-fixtures/entity-links.json"))

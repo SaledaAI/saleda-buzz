@@ -26,8 +26,8 @@ import { getIdentity, importIdentity } from "@/shared/api/tauriIdentity";
 import { listPersonas } from "@/shared/api/tauriPersonas";
 import { relayClient } from "@/shared/api/relayClient";
 import type { AgentPersona } from "@/shared/api/types";
+import { STARTER_AGENT_BRAND } from "@/shared/brand";
 import { cn } from "@/shared/lib/cn";
-import { useSystemColorScheme } from "@/shared/theme/useSystemColorScheme";
 import { Button } from "@/shared/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
@@ -53,11 +53,9 @@ function isRelayMembershipDeniedError(error: unknown): boolean {
   );
 }
 
-const STARTER_PERSONA_ANIMATIONS: Record<string, string> = {
-  Fizz: "/onboarding/starter-team/fizz.png",
-  Honey: "/onboarding/starter-team/honey.png",
-  Pollen: "/onboarding/starter-team/pollen.png",
-};
+const STARTER_PERSONA_ANIMATIONS = Object.fromEntries(
+  STARTER_AGENT_BRAND.map(({ animationUrl, name }) => [name, animationUrl]),
+);
 
 /** Fade duration for the "entering" curtain over the mounting app. */
 const ENTERING_CURTAIN_FADE_MS = 500;
@@ -154,7 +152,6 @@ export function CommunityOnboardingFlow({
 }) {
   const { transaction, update, clear } = useCommunityOnboarding();
   const queryClient = useQueryClient();
-  const systemColorScheme = useSystemColorScheme();
   const [displayName, setDisplayName] = React.useState("");
   const [avatarUrl, setAvatarUrl] = React.useState("");
   const [localAvatarPreviewUrl, setLocalAvatarPreviewUrl] = React.useState<
@@ -205,7 +202,7 @@ export function CommunityOnboardingFlow({
     void listPersonas()
       .then((personas) =>
         setStarterPersonas(
-          ["Fizz", "Honey", "Pollen"].flatMap((name) => {
+          STARTER_AGENT_BRAND.flatMap(({ name }) => {
             const persona = personas.find(
               (candidate) => candidate.displayName === name,
             );
@@ -478,7 +475,7 @@ export function CommunityOnboardingFlow({
         isCurtainFading &&
           "pointer-events-none opacity-0 transition-opacity ease-out motion-reduce:transition-none",
       )}
-      data-system-color-scheme={systemColorScheme}
+      data-system-color-scheme="light"
       data-testid="community-onboarding-flow"
       style={
         isCurtainFading
@@ -751,8 +748,8 @@ export function CommunityOnboardingFlow({
                   Meet your starter team
                 </h1>
                 <p className="mx-auto mt-3 max-w-[400px] text-sm leading-6 text-foreground/80">
-                  Buzz lets you bring multiple agents into the same workspace.
-                  Your team will help you get started using Buzz.
+                  Zorro lets you bring multiple agents into the same workspace.
+                  Your team will help you get started using Zorro.
                 </p>
                 <div className="flex w-full flex-1 items-center justify-center py-10">
                   {starterPersonas.length > 0 ? (
@@ -804,7 +801,7 @@ export function CommunityOnboardingFlow({
                     {isPending || transaction.stage === "entering" ? (
                       <LoadingDots label="Preparing Welcome" />
                     ) : (
-                      "Take me to Buzz"
+                      "Take me to Zorro"
                     )}
                   </Button>
                   {starterChannelFailureCount >= 2 ? (

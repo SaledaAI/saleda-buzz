@@ -34,7 +34,7 @@ impl TtsPipeline {
                 text,
             })
             .map_err(|e| {
-                eprintln!("buzz-desktop: TTS queue saturated, dropping message: {e}");
+                eprintln!("zorro-desktop: TTS queue saturated, dropping message: {e}");
                 format!("TTS queue full, dropping: {e}")
             })
     }

@@ -10,6 +10,7 @@ import {
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invokeTauri } from "@/shared/api/tauri";
+import { PRODUCT_THEME } from "@/shared/brand";
 import { isMacPlatform } from "@/shared/lib/platform";
 import { getStorageItem } from "@/shared/lib/safeStorage";
 import { createThemeVars, hexToHsl } from "./adaptive-theme";
@@ -25,6 +26,7 @@ import {
 
 export const THEME_STORAGE_KEY = "buzz-theme";
 const CACHE_KEY = "buzz-theme-cache";
+const THEME_CACHE_VERSION = 10;
 export const ACCENT_STORAGE_KEY = "buzz-accent-color";
 export const GLASS_BACKGROUND_STORAGE_KEY = "buzz-glass-background";
 export const GLASS_OPACITY_STORAGE_KEY = "buzz-glass-opacity";
@@ -104,6 +106,12 @@ function readStoredTheme(fallback: SyntaxThemeName): SyntaxThemeName {
   // Migrate legacy values
   if (stored === "light") return "catppuccin-latte";
   if (stored === "dark" || stored === "system") return "houston";
+  if (stored === "buzz" || stored === "buzz-dark") {
+    const migrated =
+      stored === "buzz" ? PRODUCT_THEME.light : PRODUCT_THEME.dark;
+    window.localStorage.setItem(THEME_STORAGE_KEY, migrated);
+    return migrated;
+  }
 
   return isValidThemeName(stored) ? stored : fallback;
 }
@@ -243,8 +251,8 @@ function applyAccentColor(value: string) {
  * appearance panel hides the accent picker. The user's chosen accent is left
  * untouched in storage so it returns when they switch back to another theme.
  */
-export function isBuzzTheme(themeName: string): boolean {
-  return themeName === "buzz" || themeName === "buzz-dark";
+export function isZorroTheme(themeName: string): boolean {
+  return themeName === PRODUCT_THEME.light || themeName === PRODUCT_THEME.dark;
 }
 
 /**
@@ -255,13 +263,13 @@ function resolveEffectiveAccent(
   themeName: string,
   accentColor: string,
 ): string {
-  return isBuzzTheme(themeName) ? NEUTRAL_ACCENT : accentColor;
+  return isZorroTheme(themeName) ? NEUTRAL_ACCENT : accentColor;
 }
 
 /** Toggle the Buzz-specific gradient marker independently from glass. */
 function applyBuzzSidebar(themeName: string) {
   const root = document.documentElement;
-  if (isBuzzTheme(themeName)) {
+  if (isZorroTheme(themeName)) {
     root.setAttribute("data-buzz-sidebar", "");
     // Keep the concrete Buzz variant on the root as well as the generic
     // marker. The gradient stylesheet matches this attribute directly, which
@@ -400,7 +408,11 @@ function applyCachedVars(): string | null {
   try {
     const cached = window.localStorage.getItem(CACHE_KEY);
     if (!cached) return null;
-    const { themeName, vars, isDark } = JSON.parse(cached);
+    const { version, themeName, vars, isDark } = JSON.parse(cached);
+    if (version !== THEME_CACHE_VERSION) {
+      window.localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
     const root = document.documentElement;
     for (const [key, value] of Object.entries(vars)) {
       root.style.setProperty(key, value as string);
@@ -468,7 +480,12 @@ async function applyTheme(name: SyntaxThemeName): Promise<{
   try {
     window.localStorage.setItem(
       CACHE_KEY,
-      JSON.stringify({ themeName: name, vars, isDark }),
+      JSON.stringify({
+        version: THEME_CACHE_VERSION,
+        themeName: name,
+        vars,
+        isDark,
+      }),
     );
   } catch {
     // Storage full — non-critical
@@ -479,7 +496,7 @@ async function applyTheme(name: SyntaxThemeName): Promise<{
 
 export function ThemeProvider({
   children,
-  defaultTheme = "buzz",
+  defaultTheme = PRODUCT_THEME.light,
 }: ThemeProviderProps) {
   const glassBackgroundSupported = isTauri() && isMacPlatform();
 
@@ -524,8 +541,8 @@ export function ThemeProvider({
   const [followSystem, setFollowSystemState] = useState<boolean>(() => {
     const stored = getStorageItem(FOLLOW_SYSTEM_KEY);
     if (stored !== null) return stored === "true";
-    // Fresh profiles (no saved theme) default to System mode so the Buzz
-    // default tracks the OS light/dark scheme. Profiles that picked a theme
+    // Fresh profiles (no saved theme) default to System mode so Zorro
+    // tracks the OS with its light/dark pair. Profiles that picked a theme
     // before this toggle existed keep their fixed theme until they opt in.
     return getStorageItem(THEME_STORAGE_KEY) === null;
   });
@@ -579,7 +596,7 @@ export function ThemeProvider({
   // but remove the live marker for every other theme.
   useEffect(() => {
     setProminentActiveTabActive(
-      prominentActiveTab && isBuzzTheme(effectiveTheme),
+      prominentActiveTab && isZorroTheme(effectiveTheme),
     );
   }, [effectiveTheme, prominentActiveTab]);
 

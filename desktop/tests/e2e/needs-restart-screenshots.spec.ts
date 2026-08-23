@@ -74,7 +74,7 @@ const STANDALONE_AGENT = {
 const PERSONA_AGENT = {
   pubkey: TEST_IDENTITIES.bob.pubkey,
   name: "Persona Agent",
-  personaId: "builtin:fizz",
+  personaId: "builtin:diego",
   status: "running" as const,
   needsRestart: true,
   restartDiff: DIFF_ENTRIES,
@@ -254,7 +254,7 @@ test.describe("restart-diff screenshots", () => {
 
   test("02-grid-persona-restart-badge", async ({ page }) => {
     await installMockBridge(page, {
-      activePersonaIds: ["builtin:fizz"],
+      activePersonaIds: ["builtin:diego"],
       managedAgents: [PERSONA_AGENT],
     });
 
@@ -428,7 +428,7 @@ test.describe("restart-diff screenshots", () => {
     const banner = panel.getByTestId("needs-restart-banner");
     await expect(banner).toBeVisible({ timeout: 10_000 });
     await expect(
-      banner.getByText("Buzz can restart it automatically"),
+      banner.getByText("Zorro can restart it automatically"),
     ).toBeVisible();
 
     await waitForAnimations(page);

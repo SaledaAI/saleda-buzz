@@ -16,6 +16,7 @@ import { selectionItemFromCommit } from "@/features/projects/lib/projectSelectio
 import { commitShareLink } from "@/features/projects/lib/projectShareLinks";
 import { relativeTime } from "@/features/projects/lib/projectsViewHelpers";
 import type { ProjectRepoCommit } from "@/shared/api/types";
+import { PRODUCT_NAME } from "@/shared/brand";
 import { truncatePubkey } from "@/shared/lib/pubkey";
 import { BuzzLoadingState } from "@/shared/ui/BuzzLoadingState";
 import {
@@ -97,7 +98,9 @@ export function ContributorsPanel({
       profileLinked: matchedPubkey !== null,
       reviewCount: signedCounts?.reviews ?? null,
       role: signedPubkey
-        ? matchedProfile?.nip05Handle || contributor.email || "Buzz contributor"
+        ? matchedProfile?.nip05Handle ||
+          contributor.email ||
+          `${PRODUCT_NAME} contributor`
         : heuristicProfile
           ? `${
               heuristicProfile.profile.nip05Handle ||
@@ -136,7 +139,7 @@ export function ContributorsPanel({
         reviewCount: signedCounts.reviews,
         role:
           profile?.nip05Handle ||
-          (isAgent ? "Agent contributor" : "Buzz contributor"),
+          (isAgent ? "Agent contributor" : `${PRODUCT_NAME} contributor`),
         taskCount: signedCounts.tasks,
       };
     });

@@ -1,4 +1,4 @@
-//! Compatibility migration for the Bumble-to-Pollen built-in agent rename.
+//! Compatibility migration for the staged Bumble -> Pollen -> Montero rename.
 
 use std::path::Path;
 
@@ -6,8 +6,8 @@ use tauri::Manager;
 
 use super::persona_version_from_record;
 
-/// Rename the built-in research agent in persisted definitions and linked
-/// instances without overwriting user-customized fields.
+/// Advance intermediate Pollen definitions and linked instances to Montero
+/// without overwriting user-customized fields.
 pub(super) fn migrate_pollen_agent_name(app: &tauri::AppHandle) {
     let Ok(dir) = app.path().app_data_dir() else {
         return;
@@ -110,7 +110,7 @@ fn migrate_pollen_agent_name_in_file(path: &Path, now: &str) {
         let is_legacy_fizz_pollen = has_stock_pollen_instance
             && persona_id == "builtin:fizz"
             && record.get("name").and_then(serde_json::Value::as_str)
-                == Some(crate::managed_agents::POLLEN_DISPLAY_NAME);
+                == Some(crate::managed_agents::POLLEN_LEGACY_DISPLAY_NAME);
         // Definition rows are absent on direct upgrades from the pre-unified
         // persona store. The stock hashes still let pristine linked instances
         // advance instead of appearing falsely out of date after seeding.
@@ -230,19 +230,6 @@ fn stock_version_updates(now: &str) -> std::collections::HashMap<String, (String
         updates.insert(
             crate::managed_agents::POLLEN_PERSONA_ID.to_string(),
             (persona_version(&legacy_pollen), current_pollen),
-        );
-    }
-
-    if let Some(mut legacy_fizz) =
-        crate::managed_agents::built_in_persona_definition("builtin:fizz", now)
-    {
-        let current_fizz = persona_version(&legacy_fizz);
-        legacy_fizz
-            .name_pool
-            .insert(4, crate::managed_agents::POLLEN_DISPLAY_NAME.to_string());
-        updates.insert(
-            "builtin:fizz".to_string(),
-            (persona_version(&legacy_fizz), current_fizz),
         );
     }
 
@@ -478,7 +465,7 @@ fn remove_pollen_from_legacy_fizz_name_pool(
 
     let names_without_pollen = names
         .iter()
-        .filter(|name| name.as_str() != Some(crate::managed_agents::POLLEN_DISPLAY_NAME))
+        .filter(|name| name.as_str() != Some(crate::managed_agents::POLLEN_LEGACY_DISPLAY_NAME))
         .cloned()
         .collect();
     record.insert(
@@ -628,34 +615,23 @@ mod tests {
         let (old_pollen, new_pollen) = updates
             .get(crate::managed_agents::POLLEN_PERSONA_ID)
             .unwrap();
-        let (old_fizz, new_fizz) = updates.get("builtin:fizz").unwrap();
         write_agents_json(
             dir.path(),
-            &serde_json::json!([
-                {
-                    "pubkey": "pollen-pubkey",
-                    "name": crate::managed_agents::POLLEN_LEGACY_DISPLAY_NAME,
-                    "persona_id": crate::managed_agents::POLLEN_PERSONA_ID,
-                    "system_prompt": crate::managed_agents::POLLEN_LEGACY_SYSTEM_PROMPT,
-                    "persona_source_version": old_pollen,
-                    "start_on_app_launch": false,
-                    "updated_at": "before"
-                },
-                {
-                    "pubkey": "fizz-pubkey",
-                    "name": "Fizz",
-                    "persona_id": "builtin:fizz",
-                    "persona_source_version": old_fizz,
-                    "updated_at": "before"
-                }
-            ]),
+            &serde_json::json!([{
+                "pubkey": "pollen-pubkey",
+                "name": crate::managed_agents::POLLEN_LEGACY_DISPLAY_NAME,
+                "persona_id": crate::managed_agents::POLLEN_PERSONA_ID,
+                "system_prompt": crate::managed_agents::POLLEN_LEGACY_SYSTEM_PROMPT,
+                "persona_source_version": old_pollen,
+                "start_on_app_launch": false,
+                "updated_at": "before"
+            }]),
         );
 
         migrate_pollen_agent_name_in_file(&path, "after");
 
         let records = read_agents_json(dir.path());
         assert_eq!(records[0]["persona_source_version"], *new_pollen);
-        assert_eq!(records[1]["persona_source_version"], *new_fizz);
         assert_eq!(
             read_profile_reconcile_queue(&profile_reconcile_queue_path(&path)).unwrap(),
             vec![ProfileReconcileQueueEntry {
@@ -740,12 +716,11 @@ mod tests {
     }
 
     #[test]
-    fn pollen_name_migration_repairs_stock_fizz_collision_and_profiles() {
+    fn pollen_name_migration_preserves_custom_legacy_fizz_records() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agents/managed-agents.json");
         let updates = stock_version_updates("before");
         let old_pollen = &updates[crate::managed_agents::POLLEN_PERSONA_ID].0;
-        let old_fizz = &updates["builtin:fizz"].0;
         write_agents_json(
             dir.path(),
             &serde_json::json!([
@@ -758,21 +733,8 @@ mod tests {
                     "updated_at": "before"
                 },
                 {
-                    "pubkey": "fizz-pubkey",
-                    "name": crate::managed_agents::POLLEN_DISPLAY_NAME,
-                    "persona_id": "builtin:fizz",
-                    "persona_source_version": old_fizz,
-                    "updated_at": "before"
-                },
-                {
-                    "pubkey": "occupied-pubkey",
-                    "name": "pollen-fizz",
-                    "persona_id": "custom:persona",
-                    "updated_at": "before"
-                },
-                {
                     "pubkey": "custom-fizz-pubkey",
-                    "name": crate::managed_agents::POLLEN_DISPLAY_NAME,
+                    "name": crate::managed_agents::POLLEN_LEGACY_DISPLAY_NAME,
                     "persona_id": "builtin:fizz",
                     "persona_source_version": "custom-version",
                     "updated_at": "before"
@@ -787,76 +749,43 @@ mod tests {
             records[0]["name"],
             crate::managed_agents::POLLEN_DISPLAY_NAME
         );
-        assert_eq!(records[1]["name"], "Pollen-Fizz-2");
-        assert_eq!(records[2]["name"], "pollen-fizz");
         assert_eq!(
-            records[3]["name"],
-            crate::managed_agents::POLLEN_DISPLAY_NAME
+            records[1]["name"],
+            crate::managed_agents::POLLEN_LEGACY_DISPLAY_NAME
         );
-        assert_eq!(records[3]["updated_at"], "before");
+        assert_eq!(records[1]["persona_source_version"], "custom-version");
+        assert_eq!(records[1]["updated_at"], "before");
         assert_eq!(
             read_profile_reconcile_queue(&profile_reconcile_queue_path(&path)).unwrap(),
-            vec![
-                ProfileReconcileQueueEntry {
-                    pubkey: "fizz-pubkey".to_string(),
-                    expected_name: "Pollen-Fizz-2".to_string(),
-                    reconciled_relays: Vec::new(),
-                },
-                ProfileReconcileQueueEntry {
-                    pubkey: "pollen-pubkey".to_string(),
-                    expected_name: crate::managed_agents::POLLEN_DISPLAY_NAME.to_string(),
-                    reconciled_relays: Vec::new(),
-                },
-            ]
+            vec![ProfileReconcileQueueEntry {
+                pubkey: "pollen-pubkey".to_string(),
+                expected_name: crate::managed_agents::POLLEN_DISPLAY_NAME.to_string(),
+                reconciled_relays: Vec::new(),
+            }]
         );
-
-        let once = std::fs::read(&path).unwrap();
-        migrate_pollen_agent_name_in_file(&path, "later");
-        assert_eq!(std::fs::read(path).unwrap(), once);
     }
 
     #[test]
-    fn pollen_name_migration_removes_the_new_name_from_the_legacy_fizz_pool() {
+    fn pollen_name_migration_ignores_nonstock_legacy_fizz_pool() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agents/managed-agents.json");
-        let mut legacy_fizz =
-            crate::managed_agents::built_in_persona_definition("builtin:fizz", "before").unwrap();
-        legacy_fizz
-            .name_pool
-            .insert(4, crate::managed_agents::POLLEN_DISPLAY_NAME.to_string());
-        let old_version = crate::managed_agents::persona_events::persona_content_hash(
-            &crate::managed_agents::persona_events::persona_event_content(&legacy_fizz),
-        );
-        let mut current_fizz = legacy_fizz.clone();
-        current_fizz
-            .name_pool
-            .retain(|name| name != crate::managed_agents::POLLEN_DISPLAY_NAME);
-        let new_version = crate::managed_agents::persona_events::persona_content_hash(
-            &crate::managed_agents::persona_events::persona_event_content(&current_fizz),
-        );
+        let custom_pool = serde_json::json!(["Pollen", "Custom"]);
         write_agents_json(
             dir.path(),
-            &serde_json::json!([
-                serde_json::to_value(legacy_fizz.into_agent_record()).unwrap(),
-                {
-                    "pubkey": "fizz-pubkey",
-                    "name": "Fizz",
-                    "persona_id": "builtin:fizz",
-                    "persona_source_version": old_version,
-                    "updated_at": "before"
-                }
-            ]),
+            &serde_json::json!([{
+                "pubkey": "",
+                "slug": "builtin:fizz",
+                "name": "Fizz",
+                "display_name": "Fizz",
+                "name_pool": custom_pool,
+                "updated_at": "before"
+            }]),
         );
 
         migrate_pollen_agent_name_in_file(&path, "after");
 
         let records = read_agents_json(dir.path());
-        assert_eq!(
-            records[0]["name_pool"],
-            serde_json::json!(current_fizz.name_pool)
-        );
-        assert_eq!(records[0]["updated_at"], "after");
-        assert_eq!(records[1]["persona_source_version"], new_version);
-        assert_eq!(records[1]["updated_at"], "after");
+        assert_eq!(records[0]["name_pool"], custom_pool);
+        assert_eq!(records[0]["updated_at"], "before");
     }
 }

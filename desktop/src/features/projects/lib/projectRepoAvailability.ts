@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "@/shared/brand";
+
 export type ProjectRepoUnavailableReason =
   | "missing"
   | "access"
@@ -18,13 +20,11 @@ const PROJECT_REPO_UNAVAILABLE_PRESENTATIONS: Record<
   ProjectRepoUnavailablePresentation
 > = {
   authentication: {
-    description:
-      "Buzz could not authenticate with this repository. Check your access and try again.",
+    description: `${PRODUCT_NAME} could not authenticate with this repository. Check your access and try again.`,
     title: "Repository access failed",
   },
   missing: {
-    description:
-      "The project announcement exists, but its git repository was not found on the Buzz relay.",
+    description: `The project announcement exists, but its git repository was not found on the ${PRODUCT_NAME} relay.`,
     title: "Repository not initialized",
   },
   access: {
@@ -38,8 +38,7 @@ const PROJECT_REPO_UNAVAILABLE_PRESENTATIONS: Record<
     title: "No access channel bound",
   },
   network: {
-    description:
-      "The Buzz git service could not be reached. Check your connection and try again.",
+    description: `The ${PRODUCT_NAME} git service could not be reached. Check your connection and try again.`,
     title: "Couldn’t reach repository",
   },
   ref: {
@@ -48,8 +47,7 @@ const PROJECT_REPO_UNAVAILABLE_PRESENTATIONS: Record<
     title: "Branch unavailable",
   },
   unknown: {
-    description:
-      "Buzz could not load this repository. Try again or contact the project owner.",
+    description: `${PRODUCT_NAME} could not load this repository. Try again or contact the project owner.`,
     title: "Repository unavailable",
   },
 };

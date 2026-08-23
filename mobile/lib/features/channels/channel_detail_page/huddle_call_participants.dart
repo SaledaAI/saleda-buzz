@@ -67,7 +67,7 @@ class _HuddleCallParticipants extends StatelessWidget {
     }
 
     if (!connected) {
-      return const Center(child: _HuddleLoadingBee());
+      return const Center(child: _HuddleLoadingMark());
     }
 
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
@@ -159,8 +159,8 @@ class _HuddleCallParticipants extends StatelessWidget {
   }
 }
 
-class _HuddleLoadingBee extends HookWidget {
-  const _HuddleLoadingBee();
+class _HuddleLoadingMark extends HookWidget {
+  const _HuddleLoadingMark();
 
   @override
   Widget build(BuildContext context) {
@@ -187,11 +187,11 @@ class _HuddleLoadingBee extends HookWidget {
       label: 'Joining Huddle',
       liveRegion: true,
       child: ExcludeSemantics(
-        child: FlappingBee(
-          key: const ValueKey('huddle-loading-bee'),
+        child: ZorroHatMark(
+          key: const ValueKey('huddle-loading-mark'),
           width: 60,
           color: context.colors.primary,
-          flapAmount: flapAmount,
+          strikeAmount: flapAmount,
         ),
       ),
     );

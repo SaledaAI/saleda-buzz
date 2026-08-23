@@ -2252,8 +2252,8 @@ async fn openrouter_post(
         let resp = match http
             .post(url)
             .header("content-type", "application/json")
-            .header("HTTP-Referer", "https://github.com/block/buzz")
-            .header("X-OpenRouter-Title", "Buzz")
+            .header("HTTP-Referer", "https://github.com/SaledaAI/saleda-buzz")
+            .header("X-OpenRouter-Title", "Zorro")
             .bearer_auth(bearer)
             .body(body_bytes.clone())
             .timeout(per_request_timeout)
@@ -7671,11 +7671,11 @@ mod tests {
             .expect("one request captured")
             .to_lowercase();
         assert!(
-            header_str.contains("http-referer: https://github.com/block/buzz"),
+            header_str.contains("http-referer: https://github.com/saledaai/saleda-buzz"),
             "got: {header_str}"
         );
         assert!(
-            header_str.contains("x-openrouter-title: buzz"),
+            header_str.contains("x-openrouter-title: zorro"),
             "got: {header_str}"
         );
     }

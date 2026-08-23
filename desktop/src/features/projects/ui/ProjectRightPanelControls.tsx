@@ -5,6 +5,7 @@ import {
   useTerminalPanel,
 } from "@/features/terminal/terminalPanelStore";
 import { cn } from "@/shared/lib/cn";
+import { PRODUCT_TERM_NAME } from "@/shared/brand";
 import { Button } from "@/shared/ui/button";
 import { TerminalPanelIcon } from "@/shared/ui/TerminalPanelIcon";
 
@@ -75,7 +76,11 @@ export function ProjectRightPanelControls({
   return (
     <div className="flex items-center gap-0.5">
       <Button
-        aria-label={terminalOpen ? "Hide Buzz Term" : "Open Buzz Term"}
+        aria-label={
+          terminalOpen
+            ? `Hide ${PRODUCT_TERM_NAME}`
+            : `Open ${PRODUCT_TERM_NAME}`
+        }
         aria-pressed={terminalOpen}
         className={cn(
           "h-7 w-7 text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -85,7 +90,7 @@ export function ProjectRightPanelControls({
         disabled={!terminalAvailable}
         onClick={toggleTerminalPanel}
         size="icon"
-        title="Buzz Term (⌘J)"
+        title={`${PRODUCT_TERM_NAME} (⌘J)`}
         type="button"
         variant="ghost"
       >
