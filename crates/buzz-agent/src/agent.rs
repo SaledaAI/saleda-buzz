@@ -11,7 +11,7 @@ use crate::config::{
 };
 use crate::handoff::{ContextRecovery, HandoffOutcome};
 use crate::hints::SkillEntry;
-use crate::llm::Llm;
+use crate::llm::{Llm, ToolChoice};
 use crate::mcp::McpRegistry;
 use crate::mcp::ResultBudget;
 
@@ -60,11 +60,8 @@ fn replace_unsupported_images(history: &mut [HistoryItem]) -> usize {
 }
 
 /// Maximum reply reminders emitted per prompt when `require_reply` is on.
-///
-/// After this many, the turn is allowed to end whether or not anything was
-/// published: the guard exists to catch accidental omission, not to compel
-/// speech. The shared `stop_max_rejections` budget can cut this lower — see
-/// [`Config::require_reply`](crate::config::Config::require_reply).
+/// Delivery remains mandatory after this budget: exhaustion becomes an
+/// explicit error instead of a successful but unpublished end turn.
 const MAX_REPLY_NAGS: u32 = 2;
 
 /// Server label on the synthetic reply-guard objection.
@@ -76,13 +73,51 @@ const REPLY_GUARD_SERVER: &str = "buzz-agent";
 
 /// Reminder text emitted when a turn is about to end with nothing published.
 ///
-/// Explicitly licenses silence. The base prompt tells agents that publishing is
-/// optional and "silence is usually correct"; a reminder that argued otherwise
-/// would fight that instruction and make agents chattier.
 const REPLY_GUARD_NAG: &str = "You are about to end this turn without calling `buzz messages send`. \
 Your assistant text and reasoning are never shown to anyone — if you did work, found an answer, \
 or hit a blocker that someone is waiting on, it exists only if you publish it. \
-If you already posted, or if silence is genuinely correct for this turn, ignore this and end your turn.";
+Prefer the registered `buzz_reply` tool. If it is unavailable, use the registered shell tool to run \
+`buzz messages send`. If you already posted, or if silence is genuinely correct for this turn, \
+ignore this and end your turn.";
+
+const REQUIRED_REPLY_GUARD_NAG: &str =
+    "You are about to end this turn without calling `buzz messages send`. \
+Your assistant text and reasoning are never shown to anyone — if you did work, found an answer, \
+or hit a blocker that someone is waiting on, it exists only if you publish it. \
+This runtime requires a published reply. Call the registered `buzz_reply` tool now. If it is \
+unavailable, use the registered shell tool to run the Buzz CLI. Verify that the result reports \
+`accepted: true`.";
+
+const REQUIRED_FINAL_ACTION_HEADER: &str = "[Required Final Action]";
+
+fn required_final_action(text: &str) -> Option<&str> {
+    let start = text.rfind(REQUIRED_FINAL_ACTION_HEADER)?;
+    let section = &text[start..];
+    let end = section[REQUIRED_FINAL_ACTION_HEADER.len()..]
+        .find("\n[")
+        .map(|offset| REQUIRED_FINAL_ACTION_HEADER.len() + offset)
+        .unwrap_or(section.len());
+    Some(section[..end].trim_end())
+}
+
+fn reply_guard_nag(enforced: bool, action: Option<&str>) -> String {
+    let base = if enforced {
+        REQUIRED_REPLY_GUARD_NAG
+    } else {
+        REPLY_GUARD_NAG
+    };
+    match action {
+        Some(action) => format!("{base}\n\nFollow this resolved action exactly:\n{action}"),
+        None => base.to_string(),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplyDeliveryState {
+    None,
+    Attempted,
+    Succeeded,
+}
 
 /// Whether `call` is a recognized attempt to publish a reply to Buzz.
 ///
@@ -98,6 +133,98 @@ If you already posted, or if silence is genuinely correct for this turn, ignore 
 /// suffix is exactly equivalent to "the bare tool name is `shell`".
 fn is_buzz_reply_call(call: &ToolCall, mcp: &McpRegistry) -> bool {
     mcp.has(&call.name) && !mcp.is_hook(&call.name) && is_reply_shaped(&call.name, &call.arguments)
+}
+
+fn is_buzz_message_send_call(call: &ToolCall, mcp: &McpRegistry) -> bool {
+    mcp.has(&call.name)
+        && !mcp.is_hook(&call.name)
+        && (is_structured_buzz_reply_shaped(&call.name, &call.arguments)
+            || is_message_send_shaped(&call.name, &call.arguments))
+}
+
+/// Verify the dev-shell envelope and the Buzz CLI response, rather than
+/// treating a publish-shaped command as delivery. The shell MCP intentionally
+/// returns a successful MCP result even when the child exits non-zero, so both
+/// the outer `exit_code` and inner CLI `{accepted:true}` are load-bearing.
+fn buzz_reply_succeeded(call: &ToolCall, mcp: &McpRegistry, result: &ToolResult) -> bool {
+    if !is_buzz_message_send_call(call, mcp) {
+        return false;
+    }
+    if is_structured_buzz_reply_shaped(&call.name, &call.arguments) {
+        direct_result_reports_accepted(result)
+    } else {
+        shell_result_reports_accepted(result)
+    }
+}
+
+fn accepted_cli_payload(value: &serde_json::Value) -> bool {
+    value.get("accepted").and_then(serde_json::Value::as_bool) == Some(true)
+        && value
+            .get("event_id")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|event_id| {
+                event_id.len() == 64 && event_id.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+}
+
+fn direct_result_reports_accepted(result: &ToolResult) -> bool {
+    !result.is_error
+        && serde_json::from_str::<serde_json::Value>(result.text().trim())
+            .is_ok_and(|value| accepted_cli_payload(&value))
+}
+
+fn shell_result_reports_accepted(result: &ToolResult) -> bool {
+    if result.is_error {
+        return false;
+    }
+    let Ok(shell) = serde_json::from_str::<serde_json::Value>(&result.text()) else {
+        return false;
+    };
+    if shell.get("exit_code").and_then(serde_json::Value::as_i64) != Some(0) {
+        return false;
+    }
+    shell
+        .get("stdout")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|stdout| serde_json::from_str::<serde_json::Value>(stdout.trim()).ok())
+        .is_some_and(|cli| accepted_cli_payload(&cli))
+}
+
+fn reply_delivery_error(state: ReplyDeliveryState) -> AgentError {
+    let detail = match state {
+        ReplyDeliveryState::None => {
+            "the model never attempted the `buzz_reply` tool or `buzz messages send`"
+        }
+        ReplyDeliveryState::Attempted => {
+            "a publish was attempted but did not exit successfully with `accepted: true`"
+        }
+        ReplyDeliveryState::Succeeded => "delivery state was inconsistent",
+    };
+    AgentError::Mcp(format!("required Buzz reply was not published: {detail}"))
+}
+
+fn reply_guard_satisfied(cfg: &Config, state: ReplyDeliveryState) -> bool {
+    if cfg.enforce_reply_delivery {
+        state == ReplyDeliveryState::Succeeded
+    } else {
+        state != ReplyDeliveryState::None
+    }
+}
+
+fn finish_turn(
+    cfg: &Config,
+    state: ReplyDeliveryState,
+    stop: StopReason,
+) -> Result<StopReason, AgentError> {
+    if stop != StopReason::Cancelled
+        && cfg.require_reply
+        && cfg.enforce_reply_delivery
+        && !reply_guard_satisfied(cfg, state)
+    {
+        Err(reply_delivery_error(state))
+    } else {
+        Ok(stop)
+    }
 }
 
 /// Whether a tool name and arguments have the shape of a Buzz publish command.
@@ -131,6 +258,133 @@ fn is_reply_shaped(name: &str, arguments: &serde_json::Value) -> bool {
                 // that reacted would punish documented-correct behavior.
                 cmd.contains("messages send") || cmd.contains("reactions add")
             })
+}
+
+fn is_message_send_shaped(name: &str, arguments: &serde_json::Value) -> bool {
+    name.ends_with("__shell")
+        && arguments
+            .get("command")
+            .and_then(|value| value.as_str())
+            .is_some_and(command_invokes_buzz_message_send)
+}
+
+fn is_structured_buzz_reply_shaped(name: &str, arguments: &serde_json::Value) -> bool {
+    name.ends_with("__buzz_reply")
+        && arguments
+            .get("channel")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|channel| !channel.trim().is_empty())
+        && arguments
+            .get("content")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|content| !content.trim().is_empty())
+}
+
+/// Conservatively identify an actual Buzz CLI send command in a shell string.
+///
+/// Enforced delivery cannot use the advisory guard's substring matcher: quoted
+/// text such as `echo "buzz messages send"` is not a publication. This small
+/// lexer keeps quoted text in one token, splits shell command boundaries, and
+/// accepts Buzz only as the executable for that command segment.
+fn command_invokes_buzz_message_send(command: &str) -> bool {
+    shell_command_segments(command)
+        .iter()
+        .any(|segment| segment_invokes_buzz_message_send(segment))
+}
+
+fn segment_invokes_buzz_message_send(segment: &[String]) -> bool {
+    let mut executable = 0;
+    while segment
+        .get(executable)
+        .is_some_and(|token| is_shell_assignment(token))
+    {
+        executable += 1;
+    }
+    while segment
+        .get(executable)
+        .is_some_and(|token| matches!(shell_basename(token), "command" | "env" | "exec"))
+    {
+        executable += 1;
+        while segment
+            .get(executable)
+            .is_some_and(|token| token.starts_with('-') || is_shell_assignment(token))
+        {
+            executable += 1;
+        }
+    }
+    if !segment
+        .get(executable)
+        .is_some_and(|token| shell_basename(token) == "buzz")
+    {
+        return false;
+    }
+    segment[executable + 1..]
+        .windows(2)
+        .any(|tokens| tokens[0] == "messages" && matches!(tokens[1].as_str(), "send" | "send-diff"))
+}
+
+fn shell_basename(token: &str) -> &str {
+    token.rsplit(['/', '\\']).next().unwrap_or(token)
+}
+
+fn is_shell_assignment(token: &str) -> bool {
+    let Some((name, _)) = token.split_once('=') else {
+        return false;
+    };
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte == b'_' || byte.is_ascii_alphanumeric())
+}
+
+fn shell_command_segments(command: &str) -> Vec<Vec<String>> {
+    let mut segments = Vec::new();
+    let mut segment = Vec::new();
+    let mut token = String::new();
+    let mut quote = None;
+    let mut escaped = false;
+
+    let finish_token = |segment: &mut Vec<String>, token: &mut String| {
+        if !token.is_empty() {
+            segment.push(std::mem::take(token));
+        }
+    };
+    let finish_segment = |segments: &mut Vec<Vec<String>>, segment: &mut Vec<String>| {
+        if !segment.is_empty() {
+            segments.push(std::mem::take(segment));
+        }
+    };
+
+    for character in command.chars() {
+        if escaped {
+            token.push(character);
+            escaped = false;
+            continue;
+        }
+        match quote {
+            Some(current) if character == current => quote = None,
+            Some('"') if character == '\\' => escaped = true,
+            Some(_) => token.push(character),
+            None => match character {
+                '\\' => escaped = true,
+                '\'' | '"' => quote = Some(character),
+                '|' | '&' | ';' | '\n' => {
+                    finish_token(&mut segment, &mut token);
+                    finish_segment(&mut segments, &mut segment);
+                }
+                character if character.is_whitespace() => {
+                    finish_token(&mut segment, &mut token);
+                }
+                _ => token.push(character),
+            },
+        }
+    }
+    if escaped {
+        token.push('\\');
+    }
+    finish_token(&mut segment, &mut token);
+    finish_segment(&mut segments, &mut segment);
+    segments
 }
 
 pub struct RunCtx<'a> {
@@ -310,6 +564,7 @@ impl RunCtx<'_> {
         if self.original_task.is_none() {
             *self.original_task = Some(user_text.clone());
         }
+        let resolved_reply_action = required_final_action(&user_text).map(str::to_owned);
         self.history.push(HistoryItem::User(user_text));
 
         // Reset per-turn token accumulators for this prompt.
@@ -333,14 +588,12 @@ impl RunCtx<'_> {
         // session) so a stubborn exchange can't permanently disable the stop
         // guard for a long-lived session; `max_rounds` still caps the loop.
         let mut stop_rejections = 0u32;
-        // Reply-guard state for this prompt. `prompt()` *is* the turn, so
-        // locals here are per-turn by construction — same shape as
-        // `stop_rejections` above.
-        //
-        // Named for what it proves: a *recognized attempt* to publish, not a
-        // successful publish. See `is_buzz_reply_call`.
-        let mut buzz_reply_call_seen = false;
+        // Reply-delivery state for this prompt. A command-shaped attempt is
+        // diagnostic only; required delivery is satisfied exclusively by a
+        // zero-exit CLI result whose payload says `accepted:true`.
+        let mut reply_delivery = ReplyDeliveryState::None;
         let mut reply_nags = 0u32;
+        let mut force_tool_choice = false;
         // Per-`run()` reactive context-recovery budget. Per-turn, not
         // per-session: a fresh prompt deserves a fresh chance to recover, and
         // `max_rounds` defaults to 0 (unbounded) so it cannot bound this.
@@ -351,7 +604,7 @@ impl RunCtx<'_> {
         let mut max_tokens_recoveries = 0u32;
         loop {
             if self.cfg.max_rounds > 0 && round >= self.cfg.max_rounds {
-                return Ok(StopReason::MaxTurnRequests);
+                return finish_turn(self.cfg, reply_delivery, StopReason::MaxTurnRequests);
             }
             if *self.cancel.borrow() {
                 return Ok(StopReason::Cancelled);
@@ -383,10 +636,22 @@ impl RunCtx<'_> {
                 tools.push(builtin::load_skill_def());
             }
             round = round.saturating_add(1);
+            let tool_choice = if force_tool_choice && self.cfg.supports_required_tool_choice {
+                ToolChoice::Required
+            } else {
+                ToolChoice::Auto
+            };
             let response_result = tokio::select! {
                 biased;
                 _ = self.cancel.changed() => return Ok(StopReason::Cancelled),
-                r = self.llm.complete(self.cfg, self.system_prompt, self.history, &tools, self.effective_model)
+                r = self.llm.complete_with_tool_choice(
+                    self.cfg,
+                    self.system_prompt,
+                    self.history,
+                    &tools,
+                    self.effective_model,
+                    tool_choice,
+                )
                         .instrument(tracing::info_span!("llm", session_id = %self.session_id)) => r,
                 _ = async {
                     // Keepalive ticker: emit a lightweight session update every 30s
@@ -668,7 +933,7 @@ impl RunCtx<'_> {
                         max_recoveries = self.cfg.max_token_recoveries,
                         "provider repeatedly hit output token limit; recovery budget exhausted"
                     );
-                    return Ok(StopReason::MaxTokens);
+                    return finish_turn(self.cfg, reply_delivery, StopReason::MaxTokens);
                 }
                 max_tokens_recoveries = max_tokens_recoveries.saturating_add(1);
                 tracing::warn!(
@@ -693,10 +958,9 @@ impl RunCtx<'_> {
                     reasoning_details: response.reasoning_details.clone(),
                 });
                 let stop = map_stop(response.stop);
-                // Only gate genuine end_turn — don't override max_tokens/refusal.
                 if stop == StopReason::EndTurn {
                     if stop_rejections >= self.cfg.stop_max_rejections {
-                        return Ok(stop);
+                        return finish_turn(self.cfg, reply_delivery, stop);
                     }
                     let mut objections = self
                         .mcp
@@ -711,20 +975,31 @@ impl RunCtx<'_> {
                     // carrying both a hook objection and a reply reminder costs
                     // one rejection and delivers both texts.
                     if self.cfg.require_reply
-                        && !buzz_reply_call_seen
+                        && !reply_guard_satisfied(self.cfg, reply_delivery)
                         && reply_nags < MAX_REPLY_NAGS
                     {
                         reply_nags += 1;
-                        objections
-                            .push((REPLY_GUARD_SERVER.to_string(), REPLY_GUARD_NAG.to_string()));
+                        force_tool_choice = self.cfg.enforce_reply_delivery
+                            && self.cfg.supports_required_tool_choice;
+                        let nag = reply_guard_nag(
+                            self.cfg.enforce_reply_delivery,
+                            resolved_reply_action.as_deref(),
+                        );
+                        objections.push((REPLY_GUARD_SERVER.to_string(), nag));
                     }
                     if !objections.is_empty() {
                         stop_rejections = stop_rejections.saturating_add(1);
                         push_hook_outputs_as_tool_results(self.history, "_Stop", &objections);
                         continue;
                     }
+                    if self.cfg.require_reply
+                        && self.cfg.enforce_reply_delivery
+                        && !reply_guard_satisfied(self.cfg, reply_delivery)
+                    {
+                        return Err(reply_delivery_error(reply_delivery));
+                    }
                 }
-                return Ok(stop);
+                return finish_turn(self.cfg, reply_delivery, stop);
             }
 
             let mut calls = response.tool_calls;
@@ -735,10 +1010,30 @@ impl RunCtx<'_> {
                 );
                 calls.truncate(MAX_TOOL_CALLS_PER_TURN);
             }
-            // Deliberately after truncation: a publish-shaped call that was
-            // discarded never runs, so it must not suppress the reminder.
-            if self.cfg.require_reply && !buzz_reply_call_seen {
-                buzz_reply_call_seen = calls.iter().any(|c| is_buzz_reply_call(c, self.mcp));
+            // Deliberately after truncation: a discarded call never runs and
+            // therefore cannot advance delivery state. Under the enforced
+            // contract, any later tool work invalidates an earlier publish:
+            // the final externally meaningful action must be the accepted
+            // `buzz messages send`, not a progress post followed by unseen
+            // work. The advisory profiles retain their historical once-per-
+            // turn behavior.
+            if self.cfg.require_reply {
+                let attempted = calls.iter().any(|call| {
+                    if self.cfg.enforce_reply_delivery {
+                        is_buzz_message_send_call(call, self.mcp)
+                    } else {
+                        is_buzz_reply_call(call, self.mcp)
+                    }
+                });
+                if self.cfg.enforce_reply_delivery {
+                    reply_delivery = if attempted {
+                        ReplyDeliveryState::Attempted
+                    } else {
+                        ReplyDeliveryState::None
+                    };
+                } else if reply_delivery == ReplyDeliveryState::None && attempted {
+                    reply_delivery = ReplyDeliveryState::Attempted;
+                }
             }
             self.history.push(HistoryItem::Assistant {
                 text: response.text,
@@ -746,8 +1041,21 @@ impl RunCtx<'_> {
                 reasoning_details: response.reasoning_details,
             });
 
-            if let Some(stop) = self.execute_calls(&calls).await {
-                return Ok(stop);
+            let result_start = self.history.len();
+            let stop = self.execute_calls(&calls).await;
+            if self.cfg.require_reply {
+                let delivered = calls.iter().zip(&self.history[result_start..]).any(
+                    |(call, item)| {
+                        matches!(item, HistoryItem::ToolResult(result) if buzz_reply_succeeded(call, self.mcp, result))
+                    },
+                );
+                if delivered {
+                    reply_delivery = ReplyDeliveryState::Succeeded;
+                    force_tool_choice = false;
+                }
+            }
+            if let Some(stop) = stop {
+                return finish_turn(self.cfg, reply_delivery, stop);
             }
         }
     }
@@ -1330,6 +1638,35 @@ mod tests {
         }
     }
 
+    #[test]
+    fn enforced_delivery_requires_a_message_send_not_a_reaction() {
+        for command in [
+            "buzz messages send --channel X --content Y",
+            "/opt/buzz messages send-diff --diff -",
+            "printf hi | buzz --format compact messages send --content -",
+            "BUZZ_RELAY_URL=wss://relay env BUZZ_AUTH_TAG=x buzz messages send --channel X",
+        ] {
+            assert!(
+                is_message_send_shaped("dev__shell", &json!({ "command": command })),
+                "expected a real send command: {command}"
+            );
+        }
+        assert!(!is_message_send_shaped(
+            "dev__shell",
+            &json!({ "command": "buzz reactions add --event E --emoji +" }),
+        ));
+        for command in [
+            "echo 'buzz messages send --channel X'",
+            "printf '{\"event_id\":\"fake\",\"accepted\":true}' # buzz messages send",
+            "echo buzz messages send; printf accepted",
+        ] {
+            assert!(
+                !is_message_send_shaped("dev__shell", &json!({ "command": command })),
+                "quoted or argument-only text must not count: {command}"
+            );
+        }
+    }
+
     /// Commands that do real work but do not reply in the originating
     /// conversation must still be nagged.
     #[test]
@@ -1389,6 +1726,124 @@ mod tests {
         assert!(!is_reply_shaped("dev__shell", &json!({ "command": null })));
         assert!(!is_reply_shaped("dev__shell", &json!({})));
         assert!(!is_reply_shaped("dev__shell", &json!("not an object")));
+    }
+
+    fn shell_result(exit_code: i64, stdout: &str, is_error: bool) -> ToolResult {
+        ToolResult {
+            provider_id: "call-send".into(),
+            content: vec![ToolResultContent::Text(
+                json!({
+                    "exit_code": exit_code,
+                    "stdout": stdout,
+                    "stderr": "",
+                })
+                .to_string(),
+            )],
+            is_error,
+        }
+    }
+
+    #[test]
+    fn reply_delivery_requires_zero_exit_and_relay_acceptance() {
+        assert!(shell_result_reports_accepted(&shell_result(
+            0,
+            r#"{"event_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","accepted":true,"message":""}"#,
+            false,
+        )));
+        assert!(!shell_result_reports_accepted(&shell_result(
+            2,
+            r#"{"accepted":true}"#,
+            false,
+        )));
+        assert!(!shell_result_reports_accepted(&shell_result(
+            0,
+            r#"{"accepted":false,"message":"denied"}"#,
+            false,
+        )));
+        assert!(!shell_result_reports_accepted(&shell_result(
+            0,
+            r#"{"event_id":"not-a-nostr-event-id","accepted":true}"#,
+            false,
+        )));
+        assert!(!shell_result_reports_accepted(&shell_result(
+            0,
+            r#"{"accepted":true}"#,
+            true,
+        )));
+    }
+
+    #[test]
+    fn reply_delivery_rejects_missing_or_malformed_cli_payloads() {
+        assert!(!shell_result_reports_accepted(&shell_result(0, "", false)));
+        assert!(!shell_result_reports_accepted(&shell_result(
+            0, "not-json", false,
+        )));
+        let raw_stdout = ToolResult {
+            provider_id: "call-send".into(),
+            content: vec![ToolResultContent::Text(r#"{"accepted":true}"#.into())],
+            is_error: false,
+        };
+        assert!(!shell_result_reports_accepted(&raw_stdout));
+    }
+
+    #[test]
+    fn structured_reply_requires_channel_and_nonempty_content() {
+        assert!(is_structured_buzz_reply_shaped(
+            "buzz-dev-mcp__buzz_reply",
+            &json!({
+                "channel": "4970d70d-113a-47dc-883f-ff1199937e79",
+                "reply_to": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "content": "Done",
+            }),
+        ));
+        for arguments in [
+            json!({"content": "Done"}),
+            json!({"channel": "channel", "content": ""}),
+            json!({"channel": "", "content": "Done"}),
+        ] {
+            assert!(!is_structured_buzz_reply_shaped(
+                "buzz-dev-mcp__buzz_reply",
+                &arguments,
+            ));
+        }
+        assert!(!is_structured_buzz_reply_shaped(
+            "buzz-dev-mcp__shell",
+            &json!({"channel": "channel", "content": "Done"}),
+        ));
+    }
+
+    #[test]
+    fn structured_reply_delivery_requires_accepted_event() {
+        let result = |text: &str, is_error: bool| ToolResult {
+            provider_id: "call-reply".into(),
+            content: vec![ToolResultContent::Text(text.into())],
+            is_error,
+        };
+        assert!(direct_result_reports_accepted(&result(
+            r#"{"event_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","accepted":true,"message":""}"#,
+            false,
+        )));
+        assert!(!direct_result_reports_accepted(&result(
+            r#"{"event_id":"short","accepted":true}"#,
+            false,
+        )));
+        assert!(!direct_result_reports_accepted(&result(
+            r#"{"event_id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","accepted":true}"#,
+            true,
+        )));
+    }
+
+    #[test]
+    fn reply_guard_repeats_resolved_final_action() {
+        let prompt = "[Context]\nChannel: general (#4970d70d-113a-47dc-883f-ff1199937e79)\n\
+[Required Final Action]\nPreferred: buzz_reply channel=4970d70d-113a-47dc-883f-ff1199937e79 reply_to=aaaa content=<your reply>\n\
+[Event]\nhello";
+        let action = required_final_action(prompt).expect("action section");
+        let nag = reply_guard_nag(true, Some(action));
+        assert!(nag.contains("registered `buzz_reply` tool"));
+        assert!(nag.contains("channel=4970d70d-113a-47dc-883f-ff1199937e79"));
+        assert!(nag.contains("reply_to=aaaa"));
+        assert!(!nag.contains("[Event]"));
     }
 
     /// A9 regression: `reasoning_details` contributes real bytes to

@@ -491,16 +491,19 @@ pub struct Config {
     /// Maximum `_Stop` rejections per prompt. Default 3. Set to 0 to
     /// disable `_Stop` hooks entirely (agent always honors end_turn).
     pub stop_max_rejections: u32,
-    /// Remind the model to publish when a turn is about to end without any
-    /// recognized attempt to post to Buzz. Default off; opt in per agent with
-    /// `BUZZ_AGENT_REQUIRE_REPLY=1`.
+    /// Enable the Buzz reply guard for managed turns. Provider profiles choose
+    /// the default; operators can always override it with
+    /// `BUZZ_AGENT_REQUIRE_REPLY=0|1`.
     ///
-    /// Advisory only: at most `MAX_REPLY_NAGS` reminders (see `agent.rs`),
-    /// then the turn ends regardless. Bounded by the same
-    /// `stop_max_rejections` budget as `_Stop` hooks, which is the outer cap on
-    /// all end-turn objections — at the default 3 both reminders fit; at 1 only
-    /// one does; at 0 the guard is off with the hooks.
+    /// The guard emits at most `MAX_REPLY_NAGS` reminders (see `agent.rs`).
+    /// Profiles with `enforce_reply_delivery` return an explicit error if
+    /// delivery is still unsatisfied; legacy opt-in guards remain advisory.
+    /// Both modes share the `stop_max_rejections` budget with `_Stop` hooks.
     pub require_reply: bool,
+    /// Treat reply-guard exhaustion as a delivery failure. Named provider
+    /// profiles use this for models whose ACP text is otherwise silently lost;
+    /// legacy opt-in guards remain advisory.
+    pub enforce_reply_delivery: bool,
     /// Hook server allowlist. See [`HookServers`] for variant semantics.
     /// Default (env unset/empty) is `None` — hooks are off unless the
     /// operator explicitly opts in.
@@ -515,6 +518,9 @@ pub struct Config {
     pub chat_token_limit: ChatTokenLimitField,
     /// Whether this provider profile has verified reasoning-effort support.
     pub supports_reasoning_effort: bool,
+    /// Whether this provider accepts a named function `tool_choice` for a
+    /// guarded Chat Completions retry.
+    pub supports_required_tool_choice: bool,
     pub hints_enabled: bool,
     /// Thinking/reasoning effort level. `None` = use provider default (no
     /// thinking config sent). Set via `BUZZ_AGENT_THINKING_EFFORT`.
@@ -618,8 +624,12 @@ impl Config {
             openai_api,
             chat_token_limit: profile.chat_token_limit,
             supports_reasoning_effort: profile.supports_reasoning_effort,
+            supports_required_tool_choice: profile.supports_required_tool_choice,
             max_rounds: parse_env("BUZZ_AGENT_MAX_ROUNDS", 0)?,
-            max_output_tokens: parse_env("BUZZ_AGENT_MAX_OUTPUT_TOKENS", 65_536)?,
+            max_output_tokens: parse_env(
+                "BUZZ_AGENT_MAX_OUTPUT_TOKENS",
+                profile.default_max_output_tokens,
+            )?,
             max_token_recoveries: parse_env("BUZZ_AGENT_MAX_TOKEN_RECOVERIES", 3u32)?,
             llm_timeout: Duration::from_secs(parse_env("BUZZ_AGENT_LLM_TIMEOUT_SECS", 240)?),
             tool_timeout: Duration::from_secs(parse_env("BUZZ_AGENT_TOOL_TIMEOUT_SECS", 660)?),
@@ -642,7 +652,11 @@ impl Config {
             max_parallel_tools: parse_env("BUZZ_AGENT_MAX_PARALLEL_TOOLS", 8usize)?,
             hook_timeout: Duration::from_millis(parse_env("BUZZ_AGENT_HOOK_TIMEOUT_MS", 2500u64)?),
             stop_max_rejections: parse_env("BUZZ_AGENT_STOP_MAX_REJECTIONS", 3u32)?,
-            require_reply: parse_env("BUZZ_AGENT_REQUIRE_REPLY", 0u8)? != 0,
+            require_reply: parse_env(
+                "BUZZ_AGENT_REQUIRE_REPLY",
+                u8::from(profile.require_reply_by_default),
+            )? != 0,
+            enforce_reply_delivery: profile.enforce_reply_delivery_by_default,
             hook_servers: parse_hook_servers_env("MCP_HOOK_SERVERS"),
             hints_enabled: parse_env("BUZZ_AGENT_NO_HINTS", 0u8)? == 0,
             thinking_effort: parse_thinking_effort(env("BUZZ_AGENT_THINKING_EFFORT").as_deref())?,
@@ -681,6 +695,7 @@ impl Config {
             openai_api: OpenAiApi::Chat,
             chat_token_limit: profile.chat_token_limit,
             supports_reasoning_effort: profile.supports_reasoning_effort,
+            supports_required_tool_choice: profile.supports_required_tool_choice,
             max_rounds: 0,
             max_output_tokens: 1,
             max_token_recoveries: 0,
@@ -700,6 +715,7 @@ impl Config {
             hook_timeout: Duration::from_secs(1),
             stop_max_rejections: 0,
             require_reply: false,
+            enforce_reply_delivery: false,
             hook_servers: HookServers::None,
             hints_enabled: false,
             thinking_effort: None,

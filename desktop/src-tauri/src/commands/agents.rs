@@ -148,7 +148,7 @@ pub(super) async fn start_local_agent_pairs_with_preflight(
             &global_for_preflight,
         );
     ensure_relay_mesh_for_record(app, mesh_model_id.as_deref(), false).await?;
-
+    crate::managed_agents::preflight_agent_model(app, &record_snapshot).await?;
     {
         let _store_guard = state
             .managed_agents_store_lock
@@ -243,7 +243,7 @@ pub(super) async fn start_local_agent_with_preflight(
             &global,
         );
     ensure_relay_mesh_for_record(app, mesh_model_id.as_deref(), allow_fresh_create_start).await?;
-
+    crate::managed_agents::preflight_agent_model(app, &record_snapshot).await?;
     // The mesh preflight above is the suspension window Projects callbacks
     // capture their scope against: a community switch during that await
     // would otherwise spawn this pair keyed to the *new* workspace relay.

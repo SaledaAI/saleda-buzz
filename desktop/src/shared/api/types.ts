@@ -523,6 +523,7 @@ export type AgentModelsResponse = {
   agentName: string;
   agentVersion: string;
   models: AgentModelInfo[];
+  modelToolSupport?: Record<string, "supported" | "unsupported" | "unknown">;
   agentDefaultModel: string | null;
   selectedModel: string | null;
   supportsSwitching: boolean;

@@ -729,6 +729,8 @@ pub struct AgentModelsResponse {
     pub agent_version: String,
     /// Unified model list (merged from both ACP paths, deduplicated by ID).
     pub models: Vec<AgentModelInfo>,
+    /// Function-tool compatibility by model ID.
+    pub model_tool_support: BTreeMap<String, AgentModelToolSupport>,
     /// The agent's default model for a fresh session.
     pub agent_default_model: Option<String>,
     /// The user's persisted model selection (from ManagedAgentRecord.model).
@@ -979,6 +981,8 @@ pub fn resolve_mint_behavioral_defaults(
 
 mod catalog_source;
 pub use catalog_source::CatalogSource;
+mod model_support;
+pub use model_support::AgentModelToolSupport;
 mod relay_mesh;
 pub use relay_mesh::RelayMeshConfig;
 mod requests;

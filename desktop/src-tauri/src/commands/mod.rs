@@ -80,6 +80,7 @@ pub use agent_config::*;
 pub use agent_discovery::*;
 pub use agent_logs::*;
 pub use agent_metric_archive::*;
+pub(crate) use agent_models::huggingface::preflight_selected_huggingface_model;
 pub use agent_models::*;
 pub use agent_providers::*;
 pub use agent_settings::*;

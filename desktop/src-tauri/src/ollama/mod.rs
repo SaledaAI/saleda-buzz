@@ -1,4 +1,5 @@
 mod client;
+mod compatibility;
 mod config;
 mod managed;
 mod types;
@@ -8,6 +9,9 @@ pub use types::*;
 pub const OLLAMA_PULL_PROGRESS_EVENT: &str = "ollama-pull-progress";
 
 pub(crate) use client::{delete, probe, pull, show};
+pub(crate) use compatibility::{
+    cached_tool_support_for_agent, inspect_tool_support, native_endpoint_for_agent,
+};
 pub(crate) use config::{load_config, save_config, validate_endpoint};
 pub(crate) use managed::{install, start, stop};
 

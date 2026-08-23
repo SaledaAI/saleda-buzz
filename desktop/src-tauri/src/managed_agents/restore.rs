@@ -272,6 +272,19 @@ pub async fn restore_managed_agents_on_launch(
             .filter(|record| !mesh_preflight_failures.contains(&record.pubkey))
             .collect::<Vec<_>>()
     };
+    let agents_to_start = {
+        let mut compatibility_failures = std::collections::HashSet::new();
+        for record in &agents_to_start {
+            if let Err(error) = super::preflight_agent_model(app, record).await {
+                persist_restore_error(app, &state, &record.pubkey, error)?;
+                compatibility_failures.insert(record.pubkey.clone());
+            }
+        }
+        agents_to_start
+            .into_iter()
+            .filter(|record| !compatibility_failures.contains(&record.pubkey))
+            .collect::<Vec<_>>()
+    };
     if agents_to_start.is_empty() {
         return Ok(());
     }
@@ -534,23 +547,6 @@ pub(crate) fn spawn_pending_profile_reconciliations(app: &tauri::AppHandle, work
     }
 }
 
-#[cfg(test)]
-mod profile_reconcile_tests {
-    use super::profile_reconcile_completed;
-    use crate::commands::ProfileReconcileOutcome;
-
-    #[test]
-    fn skipped_reconciliation_never_retires_pending_work() {
-        assert!(profile_reconcile_completed(
-            ProfileReconcileOutcome::Reconciled
-        ));
-        assert!(!profile_reconcile_completed(
-            ProfileReconcileOutcome::SkippedDisabled
-        ));
-    }
-}
-
-#[cfg(feature = "mesh-llm")]
 fn persist_restore_error(
     app: &tauri::AppHandle,
     state: &AppState,
@@ -566,4 +562,20 @@ fn persist_restore_error(
     record.updated_at = util::now_iso();
     record.last_error = Some(error);
     save_managed_agents(app, &records)
+}
+
+#[cfg(test)]
+mod profile_reconcile_tests {
+    use super::profile_reconcile_completed;
+    use crate::commands::ProfileReconcileOutcome;
+
+    #[test]
+    fn skipped_reconciliation_never_retires_pending_work() {
+        assert!(profile_reconcile_completed(
+            ProfileReconcileOutcome::Reconciled
+        ));
+        assert!(!profile_reconcile_completed(
+            ProfileReconcileOutcome::SkippedDisabled
+        ));
+    }
 }

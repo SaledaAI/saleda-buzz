@@ -29,6 +29,49 @@ const STALL_NOTICE_THRESHOLD: std::time::Duration = std::time::Duration::from_se
 /// alongside its `_body` serializer.
 type OpenAiParse = fn(Value) -> Result<LlmResponse, AgentError>;
 
+/// Tool-selection policy for one provider request. Normal agent rounds use
+/// `Auto`; the reply guard may use `Required` for profiles that explicitly
+/// advertise support after a model tried to end without publishing. Required
+/// delivery selects the registered structured Buzz reply function when one is
+/// available, falling back to the shell function used by older MCP servers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolChoice {
+    Auto,
+    Required,
+}
+
+fn apply_tool_choice(body: &mut Value, choice: ToolChoice, required_tool: Option<&str>) {
+    if choice == ToolChoice::Required {
+        if let Some(name) = required_tool {
+            body["tool_choice"] = json!({
+                "type": "function",
+                "function": { "name": name },
+            });
+        }
+    }
+}
+
+fn unique_tool_with_suffix<'a>(tools: &'a [ToolDef], suffix: &str) -> Option<&'a str> {
+    let mut candidates = tools.iter().filter(|tool| tool.name.ends_with(suffix));
+    let only = candidates.next()?;
+    candidates.next().is_none().then_some(only.name.as_str())
+}
+
+fn required_reply_tool_name(tools: &[ToolDef]) -> Option<&str> {
+    tools
+        .iter()
+        .find(|tool| tool.name == "buzz-dev-mcp__buzz_reply")
+        .map(|tool| tool.name.as_str())
+        .or_else(|| unique_tool_with_suffix(tools, "__buzz_reply"))
+        .or_else(|| {
+            tools
+                .iter()
+                .find(|tool| tool.name == "buzz-dev-mcp__shell")
+                .map(|tool| tool.name.as_str())
+        })
+        .or_else(|| unique_tool_with_suffix(tools, "__shell"))
+}
+
 fn effective_thinking_effort(cfg: &Config) -> Option<ThinkingEffort> {
     cfg.supports_reasoning_effort
         .then_some(cfg.thinking_effort)
@@ -82,6 +125,7 @@ impl Llm {
         })
     }
 
+    #[cfg(test)]
     pub async fn complete(
         &self,
         cfg: &Config,
@@ -90,6 +134,44 @@ impl Llm {
         tools: &[ToolDef],
         effective_model: &str,
     ) -> Result<LlmResponse, AgentError> {
+        self.complete_with_tool_choice(
+            cfg,
+            system_prompt,
+            history,
+            tools,
+            effective_model,
+            ToolChoice::Auto,
+        )
+        .await
+    }
+
+    pub(crate) async fn complete_with_tool_choice(
+        &self,
+        cfg: &Config,
+        system_prompt: &str,
+        history: &[HistoryItem],
+        tools: &[ToolDef],
+        effective_model: &str,
+        tool_choice: ToolChoice,
+    ) -> Result<LlmResponse, AgentError> {
+        if tool_choice == ToolChoice::Required && cfg.openai_api != OpenAiApi::Chat {
+            return Err(AgentError::Llm(
+                "required Buzz delivery needs Chat Completions tool choice; set OPENAI_COMPAT_API=chat"
+                    .to_string(),
+            ));
+        }
+        let required_tool = if tool_choice == ToolChoice::Required {
+            Some(
+                required_reply_tool_name(tools).ok_or_else(|| {
+                        AgentError::Mcp(
+                            "required Buzz reply cannot be published: no unambiguous `buzz_reply` or shell MCP tool is registered"
+                                .to_string(),
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
         // Named compatibility profiles start conservatively: do not send a
         // provider-specific reasoning field until that profile is verified to
         // accept it. The generic OpenAI and gateway profiles retain existing
@@ -121,6 +203,7 @@ impl Llm {
                     effective_model,
                     cfg.prompt_caching,
                 );
+                apply_tool_choice(&mut body, tool_choice, required_tool);
                 self.post_openrouter(cfg, &body)
                     .await
                     .and_then(parse_openai_with_reasoning_details)
@@ -141,10 +224,10 @@ impl Llm {
                             parse_responses as OpenAiParse,
                         )
                     } else {
-                        (
-                            openai_body(cfg, system_prompt, history, tools, request_model, e),
-                            parse_openai as OpenAiParse,
-                        )
+                        let mut body =
+                            openai_body(cfg, system_prompt, history, tools, request_model, e);
+                        apply_tool_choice(&mut body, tool_choice, required_tool);
+                        (body, parse_openai as OpenAiParse)
                     }
                 })
                 .await
@@ -180,10 +263,10 @@ impl Llm {
                         // MLflow Chat path (OpenAI-shaped): normalize effort via manifest.
                         let e = effort
                             .map(|ef| normalize_effort_for_databricks_v2(ef, effective_model));
-                        (
-                            openai_body(cfg, system_prompt, history, tools, effective_model, e),
-                            parse_openai as OpenAiParse,
-                        )
+                        let mut body =
+                            openai_body(cfg, system_prompt, history, tools, effective_model, e);
+                        apply_tool_choice(&mut body, tool_choice, required_tool);
+                        (body, parse_openai as OpenAiParse)
                     }
                 })
                 .await
@@ -1517,10 +1600,18 @@ fn parse_openai(v: Value) -> Result<LlmResponse, AgentError> {
                 let f = tc
                     .get("function")
                     .ok_or_else(|| AgentError::Llm("tool_call missing function".into()))?;
-                let raw = f.get("arguments").and_then(Value::as_str).unwrap_or("{}");
-                let args: Value = serde_json::from_str(raw).map_err(|e| {
-                    AgentError::Llm(format!("tool_call.arguments not valid JSON: {e}"))
-                })?;
+                let args = match f.get("arguments") {
+                    Some(Value::String(raw)) => serde_json::from_str(raw).map_err(|e| {
+                        AgentError::Llm(format!("tool_call.arguments not valid JSON: {e}"))
+                    })?,
+                    Some(Value::Object(arguments)) => Value::Object(arguments.clone()),
+                    None | Some(Value::Null) => Value::Object(Default::default()),
+                    Some(_) => {
+                        return Err(AgentError::Llm(
+                            "tool_call.arguments must be a JSON string or object".into(),
+                        ))
+                    }
+                };
                 // Everything on the wire object we do not model, kept for replay.
                 let extra = tc
                     .as_object()
@@ -2634,6 +2725,7 @@ mod tests {
             hook_timeout: Duration::from_secs(1),
             stop_max_rejections: 0,
             require_reply: false,
+            enforce_reply_delivery: false,
             hook_servers: HookServers::None,
             api_key: "key".into(),
             model: "model".into(),
@@ -2642,6 +2734,7 @@ mod tests {
             openai_api: OpenAiApi::Chat,
             chat_token_limit: profile.chat_token_limit,
             supports_reasoning_effort: profile.supports_reasoning_effort,
+            supports_required_tool_choice: profile.supports_required_tool_choice,
             hints_enabled: true,
             thinking_effort: None,
             thinking_summary: ThinkingSummary::Auto,
@@ -2656,6 +2749,7 @@ mod tests {
         config.provider_id = profile.id;
         config.chat_token_limit = profile.chat_token_limit;
         config.supports_reasoning_effort = profile.supports_reasoning_effort;
+        config.supports_required_tool_choice = profile.supports_required_tool_choice;
         config
     }
 
@@ -2682,6 +2776,56 @@ mod tests {
                 "profile={profile_id}"
             );
         }
+    }
+
+    #[test]
+    fn required_tool_choice_selects_the_reply_function() {
+        let mut with_tools = json!({
+            "tools": [{"type": "function", "function": {"name": "dev__shell"}}],
+            "tool_choice": "auto",
+        });
+        apply_tool_choice(&mut with_tools, ToolChoice::Required, Some("dev__shell"));
+        assert_eq!(
+            with_tools["tool_choice"],
+            json!({"type": "function", "function": {"name": "dev__shell"}})
+        );
+
+        let mut without_tools = json!({"messages": []});
+        apply_tool_choice(&mut without_tools, ToolChoice::Auto, None);
+        assert!(without_tools.get("tool_choice").is_none());
+    }
+
+    #[test]
+    fn required_reply_prefers_structured_tool_then_shell_fallback() {
+        let tool = |name: &str| ToolDef {
+            name: name.to_string(),
+            description: String::new(),
+            input_schema: json!({}),
+        };
+        let canonical = vec![
+            tool("other__buzz_reply"),
+            tool("buzz-dev-mcp__buzz_reply"),
+            tool("buzz-dev-mcp__shell"),
+        ];
+        assert_eq!(
+            required_reply_tool_name(&canonical),
+            Some("buzz-dev-mcp__buzz_reply")
+        );
+
+        let structured_fallback = vec![tool("fake__buzz_reply"), tool("fake__shell")];
+        assert_eq!(
+            required_reply_tool_name(&structured_fallback),
+            Some("fake__buzz_reply")
+        );
+
+        let shell_fallback = vec![tool("fake__shell")];
+        assert_eq!(
+            required_reply_tool_name(&shell_fallback),
+            Some("fake__shell")
+        );
+
+        let ambiguous = vec![tool("one__shell"), tool("two__shell")];
+        assert_eq!(required_reply_tool_name(&ambiguous), None);
     }
 
     #[derive(Debug, Clone)]
@@ -5345,6 +5489,52 @@ mod tests {
         assert!(!extra.contains_key("id"));
         assert!(!extra.contains_key("type"));
         assert!(!extra.contains_key("function"));
+    }
+
+    #[test]
+    fn parse_openai_decodes_string_tool_arguments() {
+        let response = parse_openai(gemini_choice()).unwrap();
+        assert_eq!(response.tool_calls[0].arguments, json!({"city": "Paris"}));
+    }
+
+    #[test]
+    fn parse_openai_accepts_ollama_object_tool_arguments() {
+        let v = json!({"choices": [{"finish_reason": "tool_calls", "message": {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "call_ollama",
+                "type": "function",
+                "function": {
+                    "name": "dev__shell",
+                    "arguments": {"command": "pwd", "timeout_ms": 5000}
+                }
+            }]
+        }}]});
+
+        let response = parse_openai(v).unwrap();
+        assert_eq!(
+            response.tool_calls[0].arguments,
+            json!({"command": "pwd", "timeout_ms": 5000})
+        );
+    }
+
+    #[test]
+    fn parse_openai_rejects_non_string_non_object_tool_arguments() {
+        let v = json!({"choices": [{"finish_reason": "tool_calls", "message": {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "call_invalid",
+                "type": "function",
+                "function": {"name": "dev__shell", "arguments": ["pwd"]}
+            }]
+        }}]});
+
+        let error = parse_openai(v).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("tool_call.arguments must be a JSON string or object"));
     }
 
     #[test]
