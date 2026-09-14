@@ -1,4 +1,5 @@
-import { ChevronRight, Folders } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChevronRight, Columns3, Folders } from "lucide-react";
 import type * as React from "react";
 
 import { AppTopChromePortal } from "@/app/AppTopChromePortal";
@@ -115,6 +116,14 @@ export function ProjectDetailChrome({
           )}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          <Link
+            className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-sidebar-foreground/65 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            params={{ projectId: project.id }}
+            to="/boards/$projectId"
+          >
+            <Columns3 className="h-3.5 w-3.5" />
+            Board
+          </Link>
           {actions}
         </div>
       </div>

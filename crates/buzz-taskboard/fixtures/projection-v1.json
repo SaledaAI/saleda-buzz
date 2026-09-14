@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "legacy labels preserve in-progress",
+      "issue": {
+        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "kind": 1621,
+        "created_at": 5,
+        "tags": [
+          ["a", "30617:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd:buzz"],
+          ["t", "in-progress"]
+        ]
+      },
+      "statuses": [],
+      "maintainers": [],
+      "expected": {
+        "issueId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "snapshot": {
+          "state": "in_progress",
+          "dependencies": [],
+          "baseRef": null,
+          "executor": null,
+          "automation": "supervised"
+        },
+        "statusEventId": null,
+        "updatedAt": 5,
+        "validationErrors": []
+      }
+    },
+    {
+      "name": "authorized snapshot wins timestamp tie by event id",
+      "issue": {
+        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "kind": 1621,
+        "created_at": 5,
+        "tags": [
+          ["a", "30617:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd:buzz"]
+        ]
+      },
+      "statuses": [
+        {
+          "id": "1111111111111111111111111111111111111111111111111111111111111111",
+          "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "kind": 1630,
+          "created_at": 10,
+          "tags": [
+            ["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", "root"],
+            ["buzz-board-state", "in_progress"],
+            ["buzz-automation", "supervised"]
+          ]
+        },
+        {
+          "id": "2222222222222222222222222222222222222222222222222222222222222222",
+          "pubkey": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "kind": 1630,
+          "created_at": 10,
+          "tags": [
+            ["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", "root"],
+            ["buzz-board-state", "review"],
+            ["buzz-depends-on", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+            ["buzz-base-ref", "main"],
+            ["buzz-executor", "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"],
+            ["buzz-automation", "supervised"]
+          ]
+        }
+      ],
+      "maintainers": [],
+      "expected": {
+        "issueId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "snapshot": {
+          "state": "review",
+          "dependencies": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ],
+          "baseRef": "main",
+          "executor": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "automation": "supervised"
+        },
+        "statusEventId": "2222222222222222222222222222222222222222222222222222222222222222",
+        "updatedAt": 10,
+        "validationErrors": []
+      }
+    },
+    {
+      "name": "unauthorized newer status is ignored",
+      "issue": {
+        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "kind": 1621,
+        "created_at": 5,
+        "tags": [
+          ["a", "30617:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd:buzz"]
+        ]
+      },
+      "statuses": [
+        {
+          "id": "1111111111111111111111111111111111111111111111111111111111111111",
+          "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "kind": 1630,
+          "created_at": 10,
+          "tags": [
+            ["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", "root"],
+            ["buzz-board-state", "backlog"],
+            ["buzz-automation", "supervised"]
+          ]
+        },
+        {
+          "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "pubkey": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "kind": 1631,
+          "created_at": 20,
+          "tags": [
+            ["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", "root"],
+            ["buzz-board-state", "done"],
+            ["buzz-automation", "propose_pr"]
+          ]
+        }
+      ],
+      "maintainers": [],
+      "expected": {
+        "issueId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "snapshot": {
+          "state": "backlog",
+          "dependencies": [],
+          "baseRef": null,
+          "executor": null,
+          "automation": "supervised"
+        },
+        "statusEventId": "1111111111111111111111111111111111111111111111111111111111111111",
+        "updatedAt": 10,
+        "validationErrors": []
+      }
+    },
+    {
+      "name": "partial custom snapshot falls back and blocks execution",
+      "issue": {
+        "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "kind": 1621,
+        "created_at": 5,
+        "tags": [
+          ["a", "30617:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd:buzz"]
+        ]
+      },
+      "statuses": [
+        {
+          "id": "1111111111111111111111111111111111111111111111111111111111111111",
+          "pubkey": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "kind": 1630,
+          "created_at": 10,
+          "tags": [
+            ["e", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "", "root"],
+            ["buzz-base-ref", "main"]
+          ]
+        }
+      ],
+      "maintainers": [],
+      "expected": {
+        "issueId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "snapshot": {
+          "state": "backlog",
+          "dependencies": [],
+          "baseRef": null,
+          "executor": null,
+          "automation": "supervised"
+        },
+        "statusEventId": "1111111111111111111111111111111111111111111111111111111111111111",
+        "updatedAt": 10,
+        "validationErrors": [
+          "partial task-board snapshot is missing buzz-board-state"
+        ]
+      }
+    }
+  ]
+}

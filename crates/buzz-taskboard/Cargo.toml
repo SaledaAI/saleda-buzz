@@ -1,0 +1,14 @@
+[package]
+name = "buzz-taskboard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Provider-neutral task-board projection and job protocol for Zorro"
+
+[dependencies]
+buzz-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

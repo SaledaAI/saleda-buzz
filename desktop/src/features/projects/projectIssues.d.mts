@@ -35,6 +35,11 @@ export type ProjectIssue = {
   assigneeOperationHeads: Record<string, string>;
   status: ProjectIssueStatus;
   statusEventId: string | null;
+  dependencies: string[];
+  baseRef: string | null;
+  executor: string | null;
+  automation: "supervised" | "auto_commit" | "propose_pr";
+  boardValidationErrors: string[];
   updatedAt: number;
   comments: ProjectIssueComment[];
 };
@@ -58,11 +63,13 @@ export function eventToProjectIssue(
   issue: RelayEvent,
   statusEvents?: RelayEvent[],
   commentEvents?: RelayEvent[],
+  maintainers?: string[],
 ): ProjectIssue;
 export function projectIssueEventsToIssues(
   issueEvents: RelayEvent[],
   statusEvents?: RelayEvent[],
   commentEvents?: RelayEvent[],
+  maintainers?: string[],
 ): ProjectIssue[];
 export function nextProjectIssueCommentCreatedAt(
   issue: ProjectIssue,

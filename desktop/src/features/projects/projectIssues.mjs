@@ -1,5 +1,9 @@
 import { sortEvents } from "../../shared/api/relayClientShared.ts";
 import { projectTaskCategoryFromLabels } from "./projectTaskCategories.ts";
+import {
+  projectIssueStatusLabel,
+  projectTaskBoardIssue,
+} from "../task-board/protocol.ts";
 
 // Issue assignment mirrors PR review requests (projectPullRequests.mjs):
 // a kind:1 comment labeled with this `t` tag whose `p` tags are the
@@ -53,35 +57,6 @@ export function allowedActorsForRoot(rootEvent) {
   const owner = repoOwnerFromAddress(getTag(rootEvent, "a"));
   if (owner) allowed.add(owner);
   return allowed;
-}
-
-function latestStatusForIssue(issue, statusEvents) {
-  const allowedActors = allowedActorsForRoot(issue);
-  return statusEvents
-    .filter(
-      (event) =>
-        allowedActors.has(event.pubkey.toLowerCase()) &&
-        event.tags.some((tag) => tag[0] === "e" && tag[1] === issue.id),
-    )
-    .sort((left, right) => right.created_at - left.created_at)[0];
-}
-
-function statusFromEvent(issue, statusEvent) {
-  if (statusEvent?.kind === 1631) return PROJECT_ISSUE_STATUS.DONE;
-  if (statusEvent?.kind === 1632) return PROJECT_ISSUE_STATUS.CLOSED;
-  // NIP-34 calls 1633 "Draft"; we surface it as Triage for issues. The
-  // label-based fallbacks below are client-side heuristics, not protocol.
-  if (statusEvent?.kind === 1633) return PROJECT_ISSUE_STATUS.TRIAGE;
-
-  const labels = getAllTags(issue, "t").map((label) => label.toLowerCase());
-  if (labels.includes("in-review") || labels.includes("review")) {
-    return PROJECT_ISSUE_STATUS.IN_REVIEW;
-  }
-  if (labels.includes("in-progress") || labels.includes("active")) {
-    return PROJECT_ISSUE_STATUS.IN_PROGRESS;
-  }
-  if (labels.includes("triage")) return PROJECT_ISSUE_STATUS.TRIAGE;
-  return PROJECT_ISSUE_STATUS.BACKLOG;
 }
 
 /**
@@ -182,8 +157,9 @@ export function eventToProjectIssue(
   issue,
   statusEvents = [],
   commentEvents = [],
+  maintainers = [],
 ) {
-  const latestStatus = latestStatusForIssue(issue, statusEvents);
+  const board = projectTaskBoardIssue(issue, statusEvents, maintainers);
   const issueCommentEvents = commentEvents.filter((event) =>
     event.tags.some(
       (tag) => (tag[0] === "e" || tag[0] === "E") && tag[1] === issue.id,
@@ -210,12 +186,17 @@ export function eventToProjectIssue(
     recipients: getAllTags(issue, "p"),
     assignees: assignmentState.assignees,
     assigneeOperationHeads: assignmentState.heads,
-    status: statusFromEvent(issue, latestStatus),
-    statusEventId: latestStatus?.id ?? null,
+    status: projectIssueStatusLabel(board.snapshot.state),
+    statusEventId: board.statusEventId,
+    dependencies: board.snapshot.dependencies,
+    baseRef: board.snapshot.baseRef,
+    executor: board.snapshot.executor,
+    automation: board.snapshot.automation,
+    boardValidationErrors: board.validationErrors,
     updatedAt:
       [
         ...comments,
-        ...(latestStatus ? [{ createdAt: latestStatus.created_at }] : []),
+        ...(board.statusEventId ? [{ createdAt: board.updatedAt }] : []),
       ].sort((left, right) => right.createdAt - left.createdAt)[0]?.createdAt ??
       issue.created_at,
     comments,
@@ -226,9 +207,12 @@ export function projectIssueEventsToIssues(
   issueEvents,
   statusEvents = [],
   commentEvents = [],
+  maintainers = [],
 ) {
   return [...issueEvents]
-    .map((issue) => eventToProjectIssue(issue, statusEvents, commentEvents))
+    .map((issue) =>
+      eventToProjectIssue(issue, statusEvents, commentEvents, maintainers),
+    )
     .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 

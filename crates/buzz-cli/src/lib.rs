@@ -222,6 +222,9 @@ enum Cmd {
     /// Create, get, list, and set status on git issues (NIP-34)
     #[command(subcommand)]
     Issues(IssuesCmd),
+    /// Publish lifecycle updates for supervised code tasks
+    #[command(subcommand)]
+    Jobs(JobsCmd),
     /// Open, update, list, and set status on git pull requests (NIP-34)
     #[command(subcommand)]
     Pr(PrCmd),
@@ -1745,6 +1748,58 @@ pub enum IssuesCmd {
     },
 }
 
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum TaskJobPhaseArg {
+    Accepted,
+    #[value(name = "waiting-for-capacity")]
+    WaitingForCapacity,
+    #[value(name = "waiting-for-model")]
+    WaitingForModel,
+    Running,
+    #[value(name = "review-ready")]
+    ReviewReady,
+    Cancelled,
+    Failed,
+    Completed,
+}
+
+#[derive(Subcommand)]
+pub enum JobsCmd {
+    /// Publish an executor-authored semantic lifecycle update
+    Update {
+        /// Root kind:43001 request event ID
+        #[arg(long)]
+        request: String,
+        /// NIP-34 issue event ID
+        #[arg(long)]
+        issue: String,
+        /// Task lifecycle phase
+        #[arg(long, value_enum)]
+        phase: TaskJobPhaseArg,
+        /// Sanitized outcome-first summary; use '-' to read from stdin
+        #[arg(long)]
+        summary: String,
+        /// Repository channel UUID, when the request is channel-scoped
+        #[arg(long)]
+        channel: Option<String>,
+    },
+    /// Request cancellation of one task without stopping the shared runtime
+    Cancel {
+        /// Root kind:43001 request event ID
+        #[arg(long)]
+        request: String,
+        /// NIP-34 issue event ID
+        #[arg(long)]
+        issue: String,
+        /// Target executor pubkey
+        #[arg(long)]
+        executor: String,
+        /// Repository channel UUID, when the request is channel-scoped
+        #[arg(long)]
+        channel: Option<String>,
+    },
+}
+
 #[derive(Subcommand)]
 pub enum UploadCmd {
     /// Upload a file to the relay's Blossom store
@@ -2061,6 +2116,7 @@ async fn run(cli: Cli) -> Result<(), CliError> {
         Cmd::Projects(sub) => commands::projects::dispatch(sub, &client).await,
         Cmd::Patches(sub) => commands::patches::dispatch(sub, &client).await,
         Cmd::Issues(sub) => commands::issues::dispatch(sub, &client).await,
+        Cmd::Jobs(sub) => commands::jobs::dispatch(sub, &client).await,
         Cmd::Pr(sub) => commands::pr::dispatch(sub, &client).await,
         Cmd::Media(sub) => commands::upload::dispatch_media(sub, &client).await,
         Cmd::Upload(sub) => commands::upload::dispatch(sub, &client).await,
@@ -2201,6 +2257,7 @@ mod tests {
             "emoji",
             "feed",
             "issues",
+            "jobs",
             "media",
             "mem",
             "messages",
@@ -2302,6 +2359,7 @@ mod tests {
             ]
         );
         assert_eq!(names(&cmd, "canvas"), vec!["get", "set"]);
+        assert_eq!(names(&cmd, "jobs"), vec!["cancel", "update"]);
         assert_eq!(names(&cmd, "reactions"), vec!["add", "get", "remove"]);
         assert_eq!(
             names(&cmd, "emoji"),
@@ -2409,6 +2467,7 @@ mod tests {
             ("emoji", 5),
             ("feed", 1),
             ("issues", 6),
+            ("jobs", 2),
             ("media", 1),
             ("messages", 8),
             ("pack", 2),
