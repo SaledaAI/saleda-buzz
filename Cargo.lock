@@ -833,6 +833,7 @@ dependencies = [
  "buzz-core",
  "buzz-persona",
  "buzz-sdk",
+ "buzz-taskboard",
  "chrono",
  "clap",
  "evalexpr",
@@ -977,6 +978,7 @@ dependencies = [
  "buzz-core",
  "buzz-persona",
  "buzz-sdk",
+ "buzz-taskboard",
  "buzz-ws-client",
  "bytes",
  "chrono",
@@ -1365,6 +1367,25 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "buzz-task-executor"
+version = "0.1.0"
+dependencies = [
+ "buzz-taskboard",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "buzz-taskboard"
+version = "0.1.0"
+dependencies = [
+ "buzz-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

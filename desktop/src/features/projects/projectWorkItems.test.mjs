@@ -15,7 +15,7 @@ const REPO_OWNER = "a".repeat(64);
 const REPO_DTAG = "relay";
 const REPO_ADDRESS = `30617:${REPO_OWNER}:${REPO_DTAG}`;
 
-const ISSUE_ID = "i".repeat(64);
+const ISSUE_ID = "1".repeat(64);
 const PR_ID = "p".repeat(64);
 const PR_ID_2 = "q".repeat(64);
 

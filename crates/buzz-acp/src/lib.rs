@@ -21,8 +21,9 @@ use std::time::Duration;
 use acp::{AcpClient, EnvVar, McpServer};
 use anyhow::{ensure, Context, Result};
 use buzz_core::kind::{
-    KIND_MEMBER_ADDED_NOTIFICATION, KIND_MEMBER_REMOVED_NOTIFICATION, KIND_STREAM_MESSAGE,
-    KIND_STREAM_REMINDER, KIND_WORKFLOW_APPROVAL_REQUESTED,
+    KIND_JOB_CANCEL, KIND_JOB_REQUEST, KIND_MEMBER_ADDED_NOTIFICATION,
+    KIND_MEMBER_REMOVED_NOTIFICATION, KIND_STREAM_MESSAGE, KIND_STREAM_REMINDER,
+    KIND_WORKFLOW_APPROVAL_REQUESTED,
 };
 use buzz_core::observer::{
     decrypt_observer_payload, encrypt_observer_payload, OBSERVER_FRAME_TELEMETRY,
@@ -2108,6 +2109,8 @@ async fn tokio_main() -> Result<()> {
                         KIND_STREAM_MESSAGE,
                         KIND_WORKFLOW_APPROVAL_REQUESTED,
                         KIND_STREAM_REMINDER,
+                        KIND_JOB_REQUEST,
+                        KIND_JOB_CANCEL,
                     ]
                 }),
                 require_mention: !config.no_mention_filter,
@@ -2807,6 +2810,40 @@ async fn tokio_main() -> Result<()> {
                                     }
                                 }
                                 // Not from owner — fall through to normal prompt handling.
+                            }
+
+                            // A task-board cancellation targets a specific code-task
+                            // request. Unlike the channel-wide `!cancel`, it may only
+                            // stop the in-flight turn whose triggering batch contains
+                            // that request event ID.
+                            if kind_u32 == buzz_core::kind::KIND_JOB_CANCEL
+                                && event_mentions_agent(&buzz_event.event, &pubkey_hex)
+                            {
+                                if let Some(owner) = owner_cache.get() {
+                                    if buzz_event.event.pubkey.to_hex() == *owner {
+                                        if let Some(request_id) = marked_event_reference(
+                                            &buzz_event.event,
+                                            "root",
+                                        ) {
+                                            let fired = signal_code_task_cancel(
+                                                &mut pool,
+                                                buzz_event.channel_id,
+                                                request_id,
+                                            );
+                                            if fired {
+                                                tracing::info!(
+                                                    channel_id = %buzz_event.channel_id,
+                                                    request_id,
+                                                    "cancelled the matching code-task turn"
+                                                );
+                                                continue;
+                                            }
+                                        }
+                                    }
+                                }
+                                // No matching in-flight request: let the cancellation
+                                // reach the normal queue so a queued/idle task can
+                                // observe it without affecting unrelated work.
                             }
 
                             // Mirrors !shutdown / !cancel: kind:9, content
@@ -3558,6 +3595,16 @@ fn is_owner_control_command(
         && event_mentions_agent(event, agent_pubkey_hex)
 }
 
+fn marked_event_reference<'a>(event: &'a nostr::Event, marker: &str) -> Option<&'a str> {
+    event.tags.iter().find_map(|tag| {
+        let values = tag.as_slice();
+        (values.first().map(String::as_str) == Some("e")
+            && values.get(3).map(String::as_str) == Some(marker))
+        .then(|| values.get(1).map(String::as_str))
+        .flatten()
+    })
+}
+
 // ── signal_in_flight_task ─────────────────────────────────────────────────────
 
 /// Decide which [`ControlSignal`] (if any) to send to an in-flight turn when a
@@ -3602,6 +3649,28 @@ fn signal_in_flight_task(
         if let Some(tx) = meta.control_tx.take() {
             tracing::info!(channel = %channel_id, ?mode, "control signal sent to in-flight task");
             let _ = tx.send(mode);
+            return true;
+        }
+    }
+    false
+}
+
+/// Cancel only the turn whose original batch contains `request_id` as a
+/// kind:43001 event. Queue mode retains that batch for panic recovery and is
+/// the configured managed-agent default.
+fn signal_code_task_cancel(pool: &mut AgentPool, channel_id: uuid::Uuid, request_id: &str) -> bool {
+    let entry = pool.task_map_mut().values_mut().find(|meta| {
+        meta.channel_id == Some(channel_id)
+            && meta.recoverable_batch.as_ref().is_some_and(|batch| {
+                batch.events.iter().any(|event| {
+                    event.event.kind.as_u16() as u32 == buzz_core::kind::KIND_JOB_REQUEST
+                        && event.event.id.to_hex().eq_ignore_ascii_case(request_id)
+                })
+            })
+    });
+    if let Some(meta) = entry {
+        if let Some(tx) = meta.control_tx.take() {
+            let _ = tx.send(ControlSignal::Cancel);
             return true;
         }
     }

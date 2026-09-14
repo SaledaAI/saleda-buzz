@@ -1,0 +1,13 @@
+[package]
+name = "buzz-task-executor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Provider-neutral supervised task execution boundary for Zorro"
+
+[dependencies]
+buzz-taskboard = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

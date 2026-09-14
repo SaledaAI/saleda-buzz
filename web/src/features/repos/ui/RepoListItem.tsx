@@ -1,4 +1,4 @@
-import { BookMarked } from "lucide-react";
+import { BookMarked, Columns3 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import { Badge } from "@/shared/ui/badge";
@@ -53,6 +53,13 @@ export function RepoListItem({
           <TooltipContent>{repo.owner}</TooltipContent>
         </Tooltip>
         <span>Updated {relativeTime(repo.createdAt)}</span>
+        <Link
+          className="inline-flex items-center gap-1 hover:text-black hover:underline dark:hover:text-white"
+          params={{ repoId: repo.id }}
+          to="/boards/$repoId"
+        >
+          <Columns3 className="h-3 w-3" /> Board
+        </Link>
       </div>
     </div>
   );

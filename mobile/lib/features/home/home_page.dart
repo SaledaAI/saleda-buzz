@@ -8,11 +8,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../shared/theme/theme.dart';
+import '../../shared/task_board/task_board_protocol.dart';
 import '../../shared/widgets/directional_transition_scope.dart';
 import '../../shared/widgets/mobile_tab_footer_backdrop.dart';
 import '../activity/activity_page.dart';
 import '../channels/channels_page.dart';
 import '../search/search_page.dart';
+import '../task_board/task_board_page.dart';
 
 class HomePage extends HookConsumerWidget {
   const HomePage({
@@ -59,6 +61,12 @@ class HomePage extends HookConsumerWidget {
       selectedIcon: LucideIcons.search500,
       label: 'Search',
     ),
+    if (taskBoardPreviewEnabled)
+      _HomeDestination(
+        icon: LucideIcons.columns3,
+        selectedIcon: LucideIcons.columns3,
+        label: 'Board',
+      ),
   ];
 
   @override
@@ -104,6 +112,10 @@ class HomePage extends HookConsumerWidget {
       if (visitedTabs.value.contains(2))
         SearchPage(tabReselection: searchReselection)
       else
+        const SizedBox.shrink(),
+      if (taskBoardPreviewEnabled && visitedTabs.value.contains(3))
+        const TaskBoardPage()
+      else if (taskBoardPreviewEnabled)
         const SizedBox.shrink(),
     ];
 
@@ -199,6 +211,8 @@ class HomePage extends HookConsumerWidget {
                       activityReselection.value++;
                     case 2:
                       searchReselection.value++;
+                    case 3:
+                      break;
                   }
                   return;
                 }

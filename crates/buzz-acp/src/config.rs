@@ -1277,7 +1277,8 @@ pub fn resolve_channel_filters(
     rules: &[SubscriptionRule],
 ) -> HashMap<Uuid, ChannelFilter> {
     use buzz_core::kind::{
-        KIND_STREAM_MESSAGE, KIND_STREAM_REMINDER, KIND_WORKFLOW_APPROVAL_REQUESTED,
+        KIND_JOB_CANCEL, KIND_JOB_REQUEST, KIND_STREAM_MESSAGE, KIND_STREAM_REMINDER,
+        KIND_WORKFLOW_APPROVAL_REQUESTED,
     };
 
     let target_channels: Vec<Uuid> = if let Some(ref overrides) = config.channels_override {
@@ -1299,6 +1300,8 @@ pub fn resolve_channel_filters(
                     KIND_STREAM_MESSAGE,
                     KIND_WORKFLOW_APPROVAL_REQUESTED,
                     KIND_STREAM_REMINDER,
+                    KIND_JOB_REQUEST,
+                    KIND_JOB_CANCEL,
                 ]
             });
             let require_mention = !config.no_mention_filter;
@@ -1379,7 +1382,8 @@ pub fn resolve_dynamic_channel_filter(
     rules: &[crate::filter::SubscriptionRule],
 ) -> Option<ChannelFilter> {
     use buzz_core::kind::{
-        KIND_STREAM_MESSAGE, KIND_STREAM_REMINDER, KIND_WORKFLOW_APPROVAL_REQUESTED,
+        KIND_JOB_CANCEL, KIND_JOB_REQUEST, KIND_STREAM_MESSAGE, KIND_STREAM_REMINDER,
+        KIND_WORKFLOW_APPROVAL_REQUESTED,
     };
 
     // In Mentions/All mode, if the operator explicitly constrained channels
@@ -1404,6 +1408,8 @@ pub fn resolve_dynamic_channel_filter(
                     KIND_STREAM_MESSAGE,
                     KIND_WORKFLOW_APPROVAL_REQUESTED,
                     KIND_STREAM_REMINDER,
+                    KIND_JOB_REQUEST,
+                    KIND_JOB_CANCEL,
                 ]
             })),
             require_mention: !config.no_mention_filter,

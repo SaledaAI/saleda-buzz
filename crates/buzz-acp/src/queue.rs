@@ -1135,6 +1135,32 @@ pub(crate) fn format_event_block(
         block.push_str(&format!("\nTags: {tags_str}"));
     }
 
+    if kind == buzz_core::kind::KIND_JOB_REQUEST {
+        match buzz_taskboard::CodeTaskRequestV1::from_json(&be.event.content) {
+            Ok(request) => block.push_str(&format!(
+                "\n\n[Code Task]\nBase ref: {}\nAutomation ceiling: {}\n{}\n\
+                 Create or reuse an isolated Git worktree under REPOS before editing. \
+                 Follow every applicable AGENTS.md. This run is supervised: do not \
+                 commit, push, open a pull request, merge, resolve the issue, or remove \
+                 the worktree. Publish concise lifecycle updates with `buzz jobs update` \
+                 using this event ID as `--request`, the `issue` e-tag as `--issue`, \
+                 and this channel as `--channel`. End with `--phase review-ready` and \
+                 leave a tested diff ready for human review.",
+                request.base_ref,
+                request.automation.as_str(),
+                request.prompt,
+            )),
+            Err(error) => block.push_str(&format!(
+                "\n\n[Code Task]\nThe request is invalid ({error}). Do not execute it."
+            )),
+        }
+    } else if kind == buzz_core::kind::KIND_JOB_CANCEL {
+        block.push_str(
+            "\n\n[Code Task Cancellation]\nStop only the referenced task session. \
+             Preserve its worktree and do not stop the shared model runtime.",
+        );
+    }
+
     // Parsed structural fields.
     let thread = parse_thread_tags(&be.event);
     let mut parsed_parts = Vec::new();
