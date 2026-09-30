@@ -12,7 +12,10 @@ import {
 } from "./personaModelDiscoveryStatus";
 import type { PersonaModelOption } from "./agentConfigOptions";
 import { providerRequiresExplicitModel } from "./agentConfigOptions";
-import { resolveModelLabel } from "@/features/agents/lib/formatAgentModelLabel";
+import {
+  disambiguateModelLabels,
+  resolveModelLabel,
+} from "@/features/agents/lib/formatAgentModelLabel";
 
 export const MODEL_DISCOVERY_LOADING_VALUE = "__model_discovery_loading__";
 
@@ -76,21 +79,24 @@ export function getDiscoveredPersonaModelOptions(
 
   return [
     ...defaultModelOption,
-    ...explicitModels.map((model) => {
-      const toolSupport = response.modelToolSupport?.[model.id] ?? "unknown";
-      return {
-        id: model.id,
-        label:
-          provider === "ollama" && toolSupport === "unsupported"
-            ? `${resolveModelLabel(model.id, model.name, provider)} (tools unsupported)`
-            : provider === "ollama" && toolSupport === "unknown"
-              ? `${resolveModelLabel(model.id, model.name, provider)} (tool support unknown)`
-              : resolveModelLabel(model.id, model.name, provider),
-        ...(provider === "ollama" && toolSupport === "unsupported"
-          ? { disabled: true }
-          : {}),
-      };
-    }),
+    ...disambiguateModelLabels(
+      explicitModels.map((model) => {
+        const toolSupport = response.modelToolSupport?.[model.id] ?? "unknown";
+        return {
+          id: model.id,
+          label:
+            provider === "ollama" && toolSupport === "unsupported"
+              ? `${resolveModelLabel(model.id, model.name, provider)} (tools unsupported)`
+              : provider === "ollama" && toolSupport === "unknown"
+                ? `${resolveModelLabel(model.id, model.name, provider)} (tool support unknown)`
+                : resolveModelLabel(model.id, model.name, provider),
+          ...(provider === "ollama" && toolSupport === "unsupported"
+            ? { disabled: true }
+            : {}),
+        };
+      }),
+      provider,
+    ),
   ];
 }
 

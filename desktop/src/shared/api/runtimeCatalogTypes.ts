@@ -32,6 +32,8 @@ export type AcpRuntimeCatalogEntry = {
   providerProfiles: AcpProviderProfile[];
   /** Environment variable used to apply thinking effort, when supported. */
   thinkingEnvVar: string | null;
+  /** Accepted harness effort values, supplied by the Rust runtime catalog. */
+  effortCanonicalValues: string[] | null;
   maxTokensEnvVar: string | null;
   contextLimitEnvVar: string | null;
   maxRoundsEnvVar: string | null;

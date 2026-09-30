@@ -24,6 +24,50 @@
 
 ---
 
+## Syncing the Saleda fork
+
+This fork tracks `block/buzz` while retaining Zorro branding, its built-in
+personas, and Ollama/Hugging Face provider support. Keep `origin` pointed at
+`https://github.com/SaledaAI/saleda-buzz.git` and add the source as `upstream`
+once per checkout:
+
+```sh
+. ./bin/activate-hermit
+git remote add -t main upstream https://github.com/block/buzz.git
+git config rerere.enabled true
+git config rerere.autoupdate false
+git config remote.pushDefault origin
+```
+
+If `upstream` already exists, verify it with `git remote -v` instead of adding
+it again. Start each sync with a clean working tree, then:
+
+```sh
+git fetch origin
+git fetch upstream
+git switch main
+git merge --ff-only origin/main
+git switch -c sync/upstream-YYYY-MM-DD
+git merge --no-ff --no-commit upstream/main
+```
+
+Resolve conflicts by combining upstream behavior with the fork's customizations;
+avoid choosing an entire side for the whole merge. Check moved code too: provider
+credentials, runtime catalog types, branded theme names, and persona IDs must
+follow upstream refactors. Keep protocol identifiers and persisted storage keys
+compatible. Git's `rerere` remembers future resolutions, but they still need review.
+
+Run the relevant tests and `just ci`, then finish the merge with
+`git add <resolved-files>` and `git commit -s`. Merge the resulting branch through
+the fork's normal review process, or fast-forward local `main` to the tested
+branch. A merge commit preserves upstream ancestry so the next sync only brings
+in newer commits. Future upstream changes can still require conflict resolution.
+
+These steps only sync local code. Publishing to GitHub requires a separately
+authorized push; deployment remains a separate action.
+
+---
+
 ## What is this, really?
 
 Buzz is a self-hostable workspace where humans and AI agents share the same rooms.

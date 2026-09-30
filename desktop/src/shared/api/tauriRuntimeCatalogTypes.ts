@@ -15,6 +15,7 @@ export type RawAcpRuntimeCatalogEntry = {
   provider_env_var?: string | null;
   provider_profiles?: RawAcpProviderProfile[];
   thinking_env_var?: string | null;
+  effort_canonical_values?: string[] | null;
   max_tokens_env_var?: string | null;
   context_limit_env_var?: string | null;
   max_rounds_env_var?: string | null;

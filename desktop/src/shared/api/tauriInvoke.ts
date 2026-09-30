@@ -1,8 +1,4 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import {
-  activateRateLimit,
-  parseRateLimitHint,
-} from "@/shared/api/relayRateLimitGate";
 
 /** Error normalized from a rejected Tauri invocation with its wire payload. */
 export class TauriInvokeError extends Error {
@@ -33,14 +29,7 @@ function toTauriError(error: unknown): Error {
   }
 }
 
-/** Apply a relay backoff when a Tauri error carries the relay 429 prefix. */
-export function applyTauriRateLimitIfNeeded(message: string): void {
-  if (message.startsWith("relay rate-limited:")) {
-    activateRateLimit(parseRateLimitHint(message));
-  }
-}
-
-/** Invoke a Tauri command with normalized errors and shared rate-limit handling. */
+/** Invoke a Tauri command with normalized errors. HTTP backoff is owned by Rust. */
 export async function invokeTauri<T>(
   command: string,
   args?: Record<string, unknown>,
@@ -48,8 +37,6 @@ export async function invokeTauri<T>(
   try {
     return await tauriInvoke<T>(command, args);
   } catch (error) {
-    const normalized = toTauriError(error);
-    applyTauriRateLimitIfNeeded(normalized.message);
-    throw normalized;
+    throw toTauriError(error);
   }
 }

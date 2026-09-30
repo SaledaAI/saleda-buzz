@@ -15,6 +15,7 @@ import { huddleWindowChannelId } from "@/features/huddle/lib/huddleWindow";
 import { CommunityOnboardingProvider } from "@/features/onboarding/communityOnboarding";
 import { PRODUCT_THEME } from "@/shared/brand";
 import { ThemeProvider } from "@/shared/theme/ThemeProvider";
+import { AvatarClipPaths } from "@/shared/ui/AvatarClipPaths";
 import { EmojiBurstProvider } from "@/shared/ui/EmojiBurstProvider";
 import { PoofBurstProvider } from "@/shared/ui/PoofBurstProvider";
 import { Toaster } from "@/shared/ui/sonner";
@@ -85,6 +86,7 @@ function renderApp() {
       {/* block/buzz#5078 — catch any uncaught render error so a WebKit
           SecurityError from localStorage can't blank the whole window. */}
       <RootErrorBoundary>
+        <AvatarClipPaths />
         <CommunitiesProvider>
           <CommunityOnboardingProvider
             enabled={huddleWindowChannelId() === null}

@@ -1,4 +1,4 @@
-import { Info, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 import {
   toggleTerminalPanel,
@@ -7,6 +7,7 @@ import {
 import { cn } from "@/shared/lib/cn";
 import { PRODUCT_TERM_NAME } from "@/shared/brand";
 import { Button } from "@/shared/ui/button";
+import { DrawerPanelIcon } from "@/shared/ui/DrawerPanelIcon";
 import { TerminalPanelIcon } from "@/shared/ui/TerminalPanelIcon";
 
 export type ProjectRightPanelMode = "chat" | "repository";
@@ -127,12 +128,10 @@ export function ProjectRightPanelControls({
         type="button"
         variant="ghost"
       >
-        <Info
-          className={cn(
-            "h-4 w-4 transition-opacity duration-200 ease-linear",
-            repositoryOpen ? "opacity-100" : "opacity-60",
-          )}
-          data-testid="project-right-panel-repository-icon"
+        <DrawerPanelIcon
+          className="-scale-x-100"
+          side={repositoryOpen ? "left" : "right"}
+          testId="project-right-panel-repository-icon"
         />
       </Button>
     </div>

@@ -7,11 +7,19 @@ use url::Url;
 use crate::nostr_bind;
 
 pub(crate) fn is_supported_deep_link_url(value: &str) -> bool {
-    value.starts_with("buzz://") || value.starts_with("zorro://")
+    if crate::build_identity::is_demo_build() {
+        crate::build_identity::is_deep_link_for_build(value)
+    } else {
+        value.starts_with("buzz://") || value.starts_with("zorro://")
+    }
 }
 
 fn is_supported_deep_link_scheme(scheme: &str) -> bool {
-    matches!(scheme, "buzz" | "zorro")
+    if crate::build_identity::is_demo_build() {
+        scheme == crate::build_identity::deep_link_scheme()
+    } else {
+        matches!(scheme, "buzz" | "zorro")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -412,6 +420,18 @@ const ENTITY_LINK_TABS: [&str; 6] = [
     "channels",
 ];
 
+/// Validate the build-specific transport URL, then hand the frontend its
+/// canonical entity-link representation. Never broaden frontend scheme trust.
+fn canonical_entity_deep_link(url: &Url, build_scheme: &str) -> Option<String> {
+    if url.scheme() != build_scheme {
+        return None;
+    }
+    parse_entity_deep_link(url)?;
+    let mut canonical = url.clone();
+    canonical.set_scheme("buzz").ok()?;
+    Some(canonical.into())
+}
+
 /// The canonical-form rules match `parseEntityLink`: no path segments, no
 /// fragment, and no parameters beyond `owner`/`d` (plus `id` for event
 /// links and the optional `tab` for coordinate links), so a future
@@ -688,17 +708,14 @@ pub(crate) fn handle_deep_link_url(app: &tauri::AppHandle, url_str: &str) {
             let _ = app.emit("deep-link-message", payload);
         }
         Some("repo" | "project" | "pr" | "issue") => {
-            // `buzz://repo|project?owner=<pubkey>&d=<dtag>` and
-            // `buzz://pr|issue?id=<eventId>&owner=<pubkey>&d=<dtag>` — the
-            // share links copied from the Projects UI. The frontend owns
-            // routing (`useEntityDeepLinks`), so the validated URL is
-            // forwarded unchanged.
-            if parse_entity_deep_link(&url).is_none() {
+            // OS routing uses this build's scheme; frontend navigation consumes
+            // canonical buzz:// entity links rather than transport identity.
+            let Some(href) = canonical_entity_deep_link(&url, url.scheme()) else {
                 eprintln!("buzz-desktop: malformed entity deep link: {url_str}");
                 return;
-            }
+            };
             activate_main_window(app);
-            let pending = queue_entity_deep_link(app, url_str.to_owned());
+            let pending = queue_entity_deep_link(app, href);
             let _ = app.emit("deep-link-entity", pending);
         }
         Some("nostr-bind") => match parse_nostr_bind_deep_link(&url) {

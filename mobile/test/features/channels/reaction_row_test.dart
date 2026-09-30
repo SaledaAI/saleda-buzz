@@ -70,6 +70,7 @@ Future<ProviderContainer> _pumpRow(
       ],
       child: ReactionRow(
         messageId: messageId,
+        channelId: 'channel',
         reactions: reactions,
         onToggle: onToggle ?? (_) {},
         showAddButton: showAddButton,
@@ -90,7 +91,7 @@ class _FakeUserCacheNotifier extends UserCacheNotifier {
   Map<String, UserProfile> build() => _profiles;
 
   @override
-  Future<void> preload(Iterable<String> pubkeys) async {}
+  Future<bool> preload(List<String> pubkeys) async => true;
 }
 
 void main() {
@@ -321,6 +322,7 @@ void main() {
               home: Scaffold(
                 body: ReactionRow(
                   messageId: _messageId,
+                  channelId: 'channel',
                   reactions: [_reaction(reactedByCurrentUser: true)],
                   onToggle: (_) {},
                 ),
@@ -367,6 +369,7 @@ void main() {
               home: Scaffold(
                 body: ReactionRow(
                   messageId: _messageId,
+                  channelId: 'channel',
                   reactions: [_reaction()],
                   onToggle: (_) {},
                 ),

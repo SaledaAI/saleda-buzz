@@ -13,6 +13,8 @@ export function ProviderCredentialField({
   inheritedLabel,
   isInherited,
   isRequired,
+  isValidating,
+  validationMessage,
   onValueChange,
   provider,
   providerProfiles,
@@ -24,6 +26,8 @@ export function ProviderCredentialField({
   inheritedLabel: string;
   isInherited: boolean;
   isRequired: boolean;
+  isValidating?: boolean;
+  validationMessage?: string | null;
   onValueChange: (next: string) => void;
   provider: string;
   providerProfiles?: readonly AcpProviderProfile[];
@@ -34,6 +38,8 @@ export function ProviderCredentialField({
     <PersonaProviderApiKeyField
       deviceSecret={providerSecretDeviceField(providerSecret)}
       disabled={disabled}
+      isValidating={isValidating}
+      validationMessage={validationMessage}
       envVarName={envVarName}
       inheritedLabel={inheritedLabel}
       isInherited={isInherited}
